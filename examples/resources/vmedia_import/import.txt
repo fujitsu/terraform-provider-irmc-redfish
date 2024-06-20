@@ -1,0 +1,4 @@
+import {
+    id = "`{"id": "/redfish/v1", "username": "admin", "password": "admin", "endpoint": "https:/10.172.201.188", "ssl_insecure": true}`"
+    to = irmc-redfish_virtual_media.vm
+}
