@@ -24,4 +24,3 @@ type VirtualMediaResourceModel struct {
 	TransferProtocolType types.String `tfsdk:"transfer_protocol_type"`
 	WriteProtected       types.Bool `tfsdk:"write_protected"`
 }
-

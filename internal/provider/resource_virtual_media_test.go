@@ -34,9 +34,18 @@ func getVMediaImportConfigurationInvalidId(d *terraform.State, creds TestingServ
 
 func TestAccRedfishVirtualMedia_basic_cd(t *testing.T) {
 	resource.Test(t, resource.TestCase{
-//		PreCheck:                 func() { testAccPreCheck(t) },
+		PreCheck:                 func() { testAccPrepareVMediaSlots(creds) },
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		Steps: []resource.TestStep{
+			{
+				Config: testAccRedfishResourceVirtualMediaConfig(
+                    creds, "10.172.181.125/gauge/vmedia/Cd!123.iso", "NFS",
+                ),
+                Check: resource.ComposeAggregateTestCheckFunc(
+                    resource.TestCheckResourceAttr(resource_name, "image", "10.172.181.125/gauge/vmedia/Cd!123.iso"),
+                    resource.TestCheckResourceAttr(resource_name, "inserted", "true"),
+                ),
+			}, 
 			{
 				Config: testAccRedfishResourceVirtualMediaConfig(
                     creds, working_cdimage_path, "HTTP",
@@ -69,7 +78,7 @@ func TestAccRedfishVirtualMedia_basic_cd(t *testing.T) {
 
 func TestAccRedfishVirtualMedia_basic_hd(t *testing.T) {
 	resource.Test(t, resource.TestCase{
-//		PreCheck:                 func() { testAccPreCheck(t) },
+		PreCheck:                 func() { testAccPrepareVMediaSlots(creds) },
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		Steps: []resource.TestStep{
 			{
@@ -95,7 +104,7 @@ func TestAccRedfishVirtualMedia_basic_hd(t *testing.T) {
 
 func TestAccRedfishVirtualMedia_NotAllowedExtension(t *testing.T) {
 	resource.Test(t, resource.TestCase{
-		PreCheck:                 func() { testAccPreCheck(t) },
+		PreCheck:                 func() { testAccPrepareVMediaSlots(creds) },
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		Steps: []resource.TestStep{
 			{
