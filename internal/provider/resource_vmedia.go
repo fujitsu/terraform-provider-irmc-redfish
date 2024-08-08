@@ -9,7 +9,6 @@ import (
 	"fmt"
 	"strings"
 	"time"
-    "log"
 
 	//	"image/internal/imageutil"
 	"terraform-provider-irmc-redfish/internal/models"
@@ -129,7 +128,7 @@ func (r *VirtualMediaResource) Configure(ctx context.Context, req resource.Confi
 
 type virtualMediaEnvironment struct {
     collection []*redfish.VirtualMedia
-    service *gofish.Service
+    client *gofish.APIClient
 }
 
 func (r *VirtualMediaResource) GetVirtualMediaEnvironment(rserver *[]models.RedfishServer) (virtualMediaEnvironment, diag.Diagnostics) {
@@ -137,15 +136,15 @@ func (r *VirtualMediaResource) GetVirtualMediaEnvironment(rserver *[]models.Redf
     var d diag.Diagnostics
     var manager []*redfish.Manager
 
-    service, err := NewConfig(r.p, rserver)
+    api, err := ConnectTargetSystem(r.p, rserver)
     if err != nil {
         d.AddError("Error while connecting to SUT", err.Error())
         return env, d
     }
 
-    env.service = service
+    env.client = api
 
-    manager, err = service.Managers()
+    manager, err = api.Service.Managers()
     if err != nil {
         d.AddError("Error when accessing Managers resource", err.Error())
         return env, d
@@ -177,7 +176,7 @@ func GetVirtualMedia(vmediaID string, vms []*redfish.VirtualMedia) (*redfish.Vir
 // WaitForMediaSuccessfullyMounted checks requested endpoint of given service
 // until the endpoint will returned Inserted as true or counter will reach limit
 func WaitForMediaSuccessfullyMounted(service *gofish.Service, endpoint string) (*redfish.VirtualMedia, error) {
-    cnt := 10 // number of tries every second
+    cnt := 20 // number of tries every second
     virtualMedia, err := redfish.GetVirtualMedia(service.GetClient(), endpoint)
     for cnt > 0 {
         if err != nil {
@@ -228,7 +227,8 @@ const (
 )
 
 func (r *VirtualMediaResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
-    log.Printf("zamojskia: create\n")
+    tflog.Info(ctx, "virtual-media: create starts")
+
     // Read Terraform plan data into the model
     var plan models.VirtualMediaResourceModel
     diags := req.Plan.Get(ctx, &plan)
@@ -264,6 +264,8 @@ func (r *VirtualMediaResource) Create(ctx context.Context, req resource.CreateRe
     if resp.Diagnostics.HasError() {
         return
     }
+
+    defer env.client.Logout()
   
     // Construct request to insert media
     virtualMediaConfig := redfish.VirtualMediaConfig {
@@ -274,7 +276,7 @@ func (r *VirtualMediaResource) Create(ctx context.Context, req resource.CreateRe
     }
 
     // Look for slot corresponding to requested image type
-    service, vmediaCollection := env.service, env.collection
+    service, vmediaCollection := env.client.Service, env.collection
     for index := range vmediaCollection {
         if (vmediaCollection[index].ID == redfish_index) {
             
@@ -288,6 +290,7 @@ func (r *VirtualMediaResource) Create(ctx context.Context, req resource.CreateRe
                 result := r.updateVirtualMediaState(vmedia, plan)
                 diags = resp.State.Set(ctx, &result)
                 resp.Diagnostics.Append(diags...)
+                tflog.Info(ctx, "virtual-media: create ends")
                 return
             }
         }
@@ -298,7 +301,8 @@ func (r *VirtualMediaResource) Create(ctx context.Context, req resource.CreateRe
 }
 
 func (r *VirtualMediaResource) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
-    log.Printf("zamojskia: read\n")
+    tflog.Info(ctx, "virtual-media: read starts")
+
     // Read Terraform prior state data into the model
     var state models.VirtualMediaResourceModel
     resp.Diagnostics.Append(req.State.Get(ctx, &state)...)
@@ -307,14 +311,16 @@ func (r *VirtualMediaResource) Read(ctx context.Context, req resource.ReadReques
     }
 
     // Connect to service
-    service, err := NewConfig(r.p, &state.RedfishServer)
+    api, err := ConnectTargetSystem(r.p, &state.RedfishServer)
     if err != nil {
         resp.Diagnostics.AddError("service error: ", err.Error())
         return
     }
 
+    defer api.Logout()
+
     // Get information about virtual media slot into which the plan has been applied
-    virtualMedia, err := redfish.GetVirtualMedia(service.GetClient(), state.Id.ValueString())
+    virtualMedia, err := redfish.GetVirtualMedia(api.Service.GetClient(), state.Id.ValueString())
     if err != nil {
         resp.Diagnostics.AddError("Virtual media does not exist: ", err.Error())
         return
@@ -327,10 +333,12 @@ func (r *VirtualMediaResource) Read(ctx context.Context, req resource.ReadReques
     // Save updated data into Terraform state
     new_state := r.updateVirtualMediaState(virtualMedia, state)
     resp.Diagnostics.Append(resp.State.Set(ctx, &new_state)...)
+    tflog.Info(ctx, "virtual-media: read ends")
 }
 
 func (r *VirtualMediaResource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
-    log.Printf("zamojskia: update\n")
+    tflog.Info(ctx, "virtual-media: update starts")
+
     // Read Terraform plan
     var plan models.VirtualMediaResourceModel
     resp.Diagnostics.Append(req.Plan.Get(ctx, &plan)...)
@@ -368,25 +376,29 @@ func (r *VirtualMediaResource) Update(ctx context.Context, req resource.UpdateRe
     }
 
     // Get information about current virtual media setup
-    service, err := NewConfig(r.p, &state.RedfishServer)
+    api, err := ConnectTargetSystem(r.p, &state.RedfishServer)
     if err != nil {
         resp.Diagnostics.AddError("Connection to service failed: ", err.Error())
         return
     }
+    
+    defer api.Logout()
 
-    vmedia, err := redfish.GetVirtualMedia(service.GetClient(), state.Id.ValueString())
+    vmedia, err := redfish.GetVirtualMedia(api.Service.GetClient(), state.Id.ValueString())
     if err != nil {
         resp.Diagnostics.AddError("Virtual media resource does not exist: ", err.Error())
         return
     }
-    
-    err = vmedia.EjectMedia()
-    if err != nil {
-        resp.Diagnostics.AddError("Error while ejecting media: ", err.Error())
-        return
-    }
 
-    time.Sleep(2 * time.Second)
+    if vmedia.Inserted {
+        err = vmedia.EjectMedia()
+        if err != nil {
+            resp.Diagnostics.AddError("Error while ejecting media: ", err.Error())
+            return
+        }
+
+        time.Sleep(2 * time.Second)
+    }
 
     // Construct request to insert media
     virtualMediaConfig := redfish.VirtualMediaConfig {
@@ -402,7 +414,7 @@ func (r *VirtualMediaResource) Update(ctx context.Context, req resource.UpdateRe
         return
     }
 
-    vmedia, err = redfish.GetVirtualMedia(service.GetClient(), state.Id.ValueString())
+    vmedia, err = redfish.GetVirtualMedia(api.Service.GetClient(), state.Id.ValueString())
     if err != nil {
         resp.Diagnostics.AddError("Virtual media does not exist ", err.Error())
         return
@@ -412,10 +424,12 @@ func (r *VirtualMediaResource) Update(ctx context.Context, req resource.UpdateRe
     result := r.updateVirtualMediaState(vmedia, state)
     diags = resp.State.Set(ctx, &result)
     resp.Diagnostics.Append(diags...)
+    tflog.Info(ctx, "virtual-media: update ends")
 }
 
 func (r *VirtualMediaResource) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {
-    log.Printf("zamojskia: delete \n")
+    tflog.Info(ctx, "virtual-media: delete starts")
+
     // Read Terraform prior state data into the model
     var state models.VirtualMediaResourceModel
     diags := req.State.Get(ctx, &state)
@@ -425,13 +439,15 @@ func (r *VirtualMediaResource) Delete(ctx context.Context, req resource.DeleteRe
     }
 
     // Get information about current virtual media setup
-    service, err := NewConfig(r.p, &state.RedfishServer)
+    api, err := ConnectTargetSystem(r.p, &state.RedfishServer)
     if err != nil {
         resp.Diagnostics.AddError("Connection to service failed: ", err.Error())
         return
     }
 
-    vmedia, err := redfish.GetVirtualMedia(service.GetClient(), state.Id.ValueString())
+    defer api.Logout()
+
+    vmedia, err := redfish.GetVirtualMedia(api.Service.GetClient(), state.Id.ValueString())
     if err != nil {
         resp.Diagnostics.AddError("Virtual media resource does not exist: ", err.Error())
         return
@@ -447,14 +463,7 @@ func (r *VirtualMediaResource) Delete(ctx context.Context, req resource.DeleteRe
     result := r.updateVirtualMediaState(vmedia, state)
     diags = resp.State.Set(ctx, &result)
     resp.Diagnostics.Append(diags...)
-    tflog.Trace(ctx, "resource_virtual_media removal finished successfully")
-}
-
-type ServerConfig struct {
-    Username string `json:"username"`
-    Password string `json:"password"`
-    Endpoint string `json:"endpoint"`
-    SslInsecure bool `json:"ssl_insecure"`
+    tflog.Info(ctx, "virtual_media: delete ends")
 }
 
 type VMediaImportConfig struct {
@@ -463,10 +472,8 @@ type VMediaImportConfig struct {
 }
 
 func (r *VirtualMediaResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
-//    tflog.Error(ctx, "to-be-removed: zamojskia: import-state")
-  //  tmp_string := "Data " + req.ID
-    // Load imported data in json format
-//    tflog.Error(ctx, tmp_string)
+    tflog.Info(ctx, "virtual_media: import starts")
+
     var config VMediaImportConfig
     err := json.Unmarshal([]byte(req.ID), &config)
     if err != nil {
@@ -491,6 +498,8 @@ func (r *VirtualMediaResource) ImportState(ctx context.Context, req resource.Imp
     if resp.Diagnostics.HasError() {
         return
     }
+    
+    defer env.client.Logout()
 
     // In collection of vmedia from SUT, look for the one which is intended to be imported
     var vmedia *redfish.VirtualMedia
@@ -510,4 +519,6 @@ func (r *VirtualMediaResource) ImportState(ctx context.Context, req resource.Imp
     })
     diags := resp.State.Set(ctx, &result)
     resp.Diagnostics.Append(diags...)
+    
+    tflog.Info(ctx, "virtual_media: import ends")
 }

@@ -90,14 +90,14 @@ func (d *IrmcVirtualMediaDataSource) Read(ctx context.Context, req datasource.Re
     }
 
     // Connect to service
-    service, err := NewConfig(d.p, &data.RedfishServer)
+    api, err := ConnectTargetSystem(d.p, &data.RedfishServer)
     if err != nil {
         resp.Diagnostics.AddError("service error: ", err.Error())
         return
     }
 
     // And look for virtual media resources
-    managers, err := service.Managers()
+    managers, err := api.Service.Managers()
     if err != nil {
         resp.Diagnostics.AddError("Could not connect to the service: ", err.Error())
         return

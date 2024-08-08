@@ -1,9 +1,8 @@
 package provider
 
 import (
-        "errors"
-        "fmt"
-        "log"
+    "errors"
+    "fmt"
 	"terraform-provider-irmc-redfish/internal/models"
 
 	"github.com/hashicorp/terraform-plugin-framework-validators/listvalidator"
@@ -16,7 +15,15 @@ import (
 const (
 	redfishServerMD string = "List of server BMCs and their respective user credentials"
     vmediaName string = "virtual_media"
+    storageVolumeName string = "storage_volume"
 )
+
+type ServerConfig struct {
+    Username string `json:"username"`
+    Password string `json:"password"`
+    Endpoint string `json:"endpoint"`
+    SslInsecure bool `json:"ssl_insecure"`
+}
 
 // RedfishServerDatasourceSchema to construct schema of redfish server
 func RedfishServerDatasourceSchema() map[string]datasourceSchema.Attribute {
@@ -96,7 +103,7 @@ func RedfishServerResourceBlockMap() map[string]resourceSchema.Block {
         }
 }
 
-func NewConfig(pconfig *IrmcProvider, rserver *[]models.RedfishServer) (*gofish.Service, error) {
+func ConnectTargetSystem(pconfig *IrmcProvider, rserver *[]models.RedfishServer) (*gofish.APIClient, error) {
 	if len(*rserver) == 0 {
 		return nil, fmt.Errorf("no provider block was found")
 	}
@@ -139,6 +146,6 @@ func NewConfig(pconfig *IrmcProvider, rserver *[]models.RedfishServer) (*gofish.
 	if err != nil {
 		return nil, fmt.Errorf("error connecting to redfish API: %w", err)
 	}
-	log.Printf("Connection with the redfish endpoint %v was sucessful\n", rserver1.Endpoint.ValueString())
-	return api.Service, nil
+
+	return api, nil
 }
