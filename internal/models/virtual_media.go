@@ -22,5 +22,4 @@ type VirtualMediaResourceModel struct {
 	Image                types.String `tfsdk:"image"`
     Inserted             types.Bool `tfsdk:"inserted"`
 	TransferProtocolType types.String `tfsdk:"transfer_protocol_type"`
-	WriteProtected       types.Bool `tfsdk:"write_protected"`
 }

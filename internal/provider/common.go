@@ -51,11 +51,11 @@ func RedfishServerDatasourceSchema() map[string]datasourceSchema.Attribute {
 func RedfishServerSchema() map[string]resourceSchema.Attribute {
 	return map[string]resourceSchema.Attribute{
         "username": resourceSchema.StringAttribute{
-			Optional:    true,
+			Required:    true,
 			Description: "User name for login",
 		},
 		"password": resourceSchema.StringAttribute{
-			Optional:    true,
+			Required:    true,
 			Description: "User password for login",
 			Sensitive:   true,
 		},
@@ -88,19 +88,19 @@ func RedfishServerDatasourceBlockMap() map[string]datasourceSchema.Block {
 }
 
 func RedfishServerResourceBlockMap() map[string]resourceSchema.Block {
-        return map[string]resourceSchema.Block{
-                "server": resourceSchema.ListNestedBlock{
-                        MarkdownDescription: redfishServerMD,
-			            Description:         redfishServerMD,
-                        Validators: []validator.List{
-                                listvalidator.SizeAtMost(1),
-                                listvalidator.IsRequired(),
-                        },
-                        NestedObject: resourceSchema.NestedBlockObject{
-                                Attributes: RedfishServerSchema(),
-                        },
-                },
-        }
+    return map[string]resourceSchema.Block{
+        "server": resourceSchema.ListNestedBlock{
+            MarkdownDescription: redfishServerMD,
+            Description:         redfishServerMD,
+            Validators: []validator.List{
+                listvalidator.SizeAtMost(1),
+                listvalidator.IsRequired(),
+            },
+            NestedObject: resourceSchema.NestedBlockObject{
+                Attributes: RedfishServerSchema(),
+            },
+        },
+    }
 }
 
 func ConnectTargetSystem(pconfig *IrmcProvider, rserver *[]models.RedfishServer) (*gofish.APIClient, error) {
