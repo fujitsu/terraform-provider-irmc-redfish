@@ -10,20 +10,15 @@ import (
 	"strings"
 	"time"
 
-	//	"image/internal/imageutil"
 	"terraform-provider-irmc-redfish/internal/models"
 
 	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
 	"github.com/hashicorp/terraform-plugin-framework/diag"
-//	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
-	"github.com/hashicorp/terraform-plugin-framework/resource/schema/booldefault"
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/hashicorp/terraform-plugin-log/tflog"
-
-	//	"google.golang.org/grpc/internal/idle"
 
 	"github.com/stmcginnis/gofish"
 	"github.com/stmcginnis/gofish/redfish"
@@ -53,7 +48,6 @@ func (r *VirtualMediaResource) updateVirtualMediaState(response *redfish.Virtual
         Image: types.StringValue(response.Image),
         Inserted: types.BoolValue(response.Inserted),
         TransferProtocolType: types.StringValue(string(response.TransferProtocolType)),
-        WriteProtected: types.BoolValue(response.WriteProtected),
         RedfishServer: plan.RedfishServer,
     }
 }
@@ -66,41 +60,34 @@ func VirtualMediaSchema() map[string]schema.Attribute {
     return map[string]schema.Attribute{
         "id": schema.StringAttribute{
             Computed:            true,
-            MarkdownDescription: "",
-            Description:         "",
+            MarkdownDescription: "ID of virtual media resource on iRMC.",
+            Description:         "ID of virtual media resource on iRMC.",
         },
         "image": schema.StringAttribute{
             Required:            true,
-            MarkdownDescription: "",
-            Description:         "",
+            MarkdownDescription: "URI of the remote media to be used for mounting.",
+            Description:         "URI of the remote media to be used for mounting.",
         },
         "inserted": schema.BoolAttribute{
             Computed:            true,
-            Description:         "Describes whether virtual media is attached or detached",
-            MarkdownDescription: "Describes whether virtual media is attached or detached",
+            Description:         "Describes whether virtual media is mounted or not.",
+            MarkdownDescription: "Describes whether virtual media is mounted or not.",
         },
         "transfer_protocol_type": schema.StringAttribute{
-            MarkdownDescription: "",
-            Description:         "",
-            Optional: true,
+            Required:            true,
+            MarkdownDescription: "Indicates protocol on which the transfer will be done.",
+            Description:         "Indicates protocol on which the transfer will be done.",
             Validators: []validator.String{
                 stringvalidator.OneOf([]string{"CIFS", "HTTP", "HTTPS", "NFS"}...),
             },
-        },
-        "write_protected": schema.BoolAttribute{
-            Optional:            true,
-            Computed:            true,
-            Description:         "Indicates whether the remote device media prevents writing to that media.",
-            MarkdownDescription: "Indicates whether the remote device media prevents writing to that media.",
-            Default:             booldefault.StaticBool(true),
         },
     }
 }
 
 func (r *VirtualMediaResource) Schema(ctx context.Context, req resource.SchemaRequest, resp *resource.SchemaResponse) {
     resp.Schema = schema.Schema{
-        MarkdownDescription: "Virtual media resource",
-        Description:         "It is used to configure virtual media on iRMC",
+        MarkdownDescription: "The resource is used to control (read, mount, unmount or modify) virtual media on Fujitsu server equipped with iRMC controller.",
+        Description:         "The resource is used to control (read, mount, unmount or modify) virtual media on Fujitsu server equipped with iRMC controller.",
         Attributes:          VirtualMediaSchema(),
         Blocks:              RedfishServerResourceBlockMap(),
     }
@@ -272,7 +259,6 @@ func (r *VirtualMediaResource) Create(ctx context.Context, req resource.CreateRe
         Image: image,
         Inserted: plan.Inserted.ValueBool(),
         TransferProtocolType: redfish.TransferProtocolType(plan.TransferProtocolType.ValueString()),
-        WriteProtected: plan.WriteProtected.ValueBool(),
     }
 
     // Look for slot corresponding to requested image type
@@ -405,7 +391,6 @@ func (r *VirtualMediaResource) Update(ctx context.Context, req resource.UpdateRe
         Image: image,
         Inserted: plan.Inserted.ValueBool(),
         TransferProtocolType: redfish.TransferProtocolType(plan.TransferProtocolType.ValueString()),
-        WriteProtected: plan.WriteProtected.ValueBool(),
     }
 
     err = vmedia.InsertMediaConfig(virtualMediaConfig)

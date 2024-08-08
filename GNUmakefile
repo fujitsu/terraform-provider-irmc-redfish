@@ -17,6 +17,10 @@ testacc:
 lint:
 	golangci-lint run --fix
 
+.PHONY: doc
+doc:
+	go generate
+
 .PHONY: build
 build:
 	go install
