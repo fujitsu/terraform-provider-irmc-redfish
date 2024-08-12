@@ -384,60 +384,6 @@ func getNewVolumeConfigFromPlan(plan models.StorageVolumeResourceModel,
 	return volume_config
 }
 
-// IsTaskFinished returns information whether task state
-// has been mapped to task finished state and the information
-// is returned as boolean
-func IsTaskFinished(state redfish.TaskState) bool {
-	switch state {
-	case redfish.CompletedTaskState, redfish.ExceptionTaskState, redfish.CancelledTaskState, redfish.KilledTaskState:
-		fallthrough
-	case redfish.InterruptedTaskState, redfish.SuspendedTaskState:
-		return true
-	default:
-		break
-	}
-	return false
-}
-
-// IsTaskFinishedSuccessfully returns information whether task state
-// has been mapped to task finished successfully or not and the information
-// is returned as boolean
-func IsTaskFinishedSuccessfully(state redfish.TaskState) bool {
-	switch state {
-	case redfish.CompletedTaskState:
-		return true
-	default:
-		return false
-	}
-}
-
-// FetchRedfishTaskLog tries to fetch logs of task pointed by location
-// from system accessed by service. If logs content could not be accessed
-// diags is filled with reason.
-func FetchRedfishTaskLog(service *gofish.Service, location string) (logs []byte, diags diag.Diagnostics) {
-	task_log_endpoint := location + "/Oem/ts_fujitsu/Logs"
-	res, err := service.GetClient().Get(task_log_endpoint)
-	if err != nil {
-		diags.AddError("Error while reading task log endpoint", err.Error())
-		return nil, diags
-	}
-
-	defer res.Body.Close()
-
-	if res.StatusCode == http.StatusOK {
-		bodyBytes, err := io.ReadAll(res.Body)
-		if err != nil {
-			diags.AddError("Error while reading task logs", err.Error())
-			return nil, diags
-		}
-
-		return bodyBytes, diags
-	} else {
-		diags.AddError("Error while reading task logs", "Endpoint returned non 200 code")
-		return nil, diags
-	}
-}
-
 // WaitForRedfishTaskEnd checks in loop until task pointed by location on service
 // will report finished state or operation will timeout (maximum time pointed by timeout_s).
 // If task has been finished with success, status is returned as true. If loop has timed or
