@@ -10,6 +10,7 @@ import (
 	resourceSchema "github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/stmcginnis/gofish"
+	"github.com/stmcginnis/gofish/redfish"
 )
 
 const (
@@ -148,4 +149,33 @@ func ConnectTargetSystem(pconfig *IrmcProvider, rserver *[]models.RedfishServer)
 	}
 
 	return api, nil
+}
+
+func GetSystemResource(service *gofish.Service) (*redfish.ComputerSystem, error) {
+	systems, err := service.Systems()
+	if err != nil {
+		return nil, err
+	}
+
+	for _, system := range systems {
+		if system.ID == "0" { // at the moment only one specific 0 is supported
+			return system, nil
+		}
+	}
+
+	return nil, fmt.Errorf("Requested System resource has not been found on list")
+}
+
+func difference(a, b []string) []string {
+	mb := make(map[string]struct{}, len(b))
+	for _, x := range b {
+		mb[x] = struct{}{}
+	}
+	var diff []string
+	for _, x := range a {
+		if _, found := mb[x]; !found {
+			diff = append(diff, x)
+		}
+	}
+	return diff
 }

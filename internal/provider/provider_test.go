@@ -4,18 +4,19 @@
 package provider
 
 import (
-    "encoding/json"
+	"encoding/json"
 	"fmt"
-    "time"
 	"io"
+	"log"
 	"os"
-    "log"
 	"testing"
+	"time"
 
 	"github.com/hashicorp/terraform-plugin-framework/providerserver"
 	"github.com/hashicorp/terraform-plugin-go/tfprotov6"
 	"github.com/joho/godotenv"
 	"github.com/stmcginnis/gofish"
+	"github.com/stmcginnis/gofish/redfish"
 )
 
 var (
@@ -107,6 +108,44 @@ func testAccPrepareVMediaSlots(creds TestingServerCredentials) {
                 time.Sleep(10*time.Second)
             }
         }
+    }
+}
+
+func testAccPrepareStorageVolume(creds TestingServerCredentials) {
+    clientConfig := gofish.ClientConfig{
+        Endpoint: "https://" + creds.Endpoint,
+        Username: creds.Username,
+        Password: creds.Password,
+        BasicAuth: true,
+        Insecure: true,
+    }
+
+    api, err := gofish.Connect(clientConfig)
+    if err != nil {
+        log.Printf("Connect to %s reported error %s", clientConfig.Endpoint, err.Error())
+        return
+    }
+
+    system, err := GetSystemResource(api.Service)
+    if err != nil {
+        log.Printf("Error while getting Systems/0 resource %s", err.Error())
+        return
+    }
+
+	list_of_storage_controllers, err := system.Storage()
+	if err != nil {
+        log.Printf("Error while getting list of storage controllers %s", err.Error())
+        return
+	}
+
+    if len(list_of_storage_controllers) == 0 {
+        log.Printf("System does not show any attached storage controller")
+        return
+    }
+
+    if system.PowerState != redfish.OnPowerState {
+        log.Printf("System host is not powered on")
+        return
     }
 }
 
