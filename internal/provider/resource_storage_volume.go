@@ -16,11 +16,16 @@ import (
 
 	"terraform-provider-irmc-redfish/internal/models"
 
-	"github.com/hashicorp/terraform-plugin-framework-validators/int64validator"
+	//	"github.com/hashicorp/terraform-plugin-framework-validators/int64validator"
 	"github.com/hashicorp/terraform-plugin-framework-validators/listvalidator"
 	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
+//	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/diag"
+//	"github.com/hashicorp/terraform-plugin-framework/types/basetypes"
 
+	//	"github.com/hashicorp/terraform-plugin-framework/types/basetypes"
+
+	//	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
@@ -37,6 +42,8 @@ import (
 
 var _ resource.Resource = &StorageVolumeResource{}
 var _ resource.ResourceWithImportState = &StorageVolumeResource{}
+
+
 
 func NewStorageVolumeResource() resource.Resource {
 	return &StorageVolumeResource{}
@@ -365,6 +372,7 @@ func getNewVolumeConfigFromPlan(plan models.StorageVolumeResourceModel,
 	// Handle optional arguments if not provided by user, do not add them to request as 0
 	// as it might make more problems than benefits
 	capacity := plan.CapacityBytes.ValueInt64()
+//    capacity := plan.CapacityBytes.Int64Value // FIXME: AZ2
 	if capacity != 0 {
 		volume_config["CapacityBytes"] = capacity
 	}
@@ -571,7 +579,8 @@ func readStorageVolumeToState(volume *redfish.Volume, state *models.StorageVolum
 	state.VolumeName = types.StringValue(volume.Name)
 	state.OptimumIOSizeBytes = types.Int64Value(int64(volume.OptimumIOSizeBytes))
 
-    state.CapacityBytes = types.Int64Value(int64(volume.CapacityBytes)) // FIXME:
+//    state.CapacityBytes = types.Int64Value(int64(volume.CapacityBytes)) // FIXME:
+    state.CapacityBytes = models.CapacityByteValue{types.Int64Value(int64(volume.CapacityBytes))}
 
 	// Theoretically volume can be migrated to different RAID type
 	state.RaidType = types.StringValue(string(volume.RAIDType))
@@ -659,6 +668,7 @@ func verifyUpdateStorageVolumePlan(ctx context.Context, state *models.StorageVol
 		return diags
 	}
 
+    // FIXME: AZ2
 	if !(plan.CapacityBytes.IsUnknown()) && plan.CapacityBytes != state.CapacityBytes {
 		diags.AddError("capacity_bytes of existing volume cannot be changed",
 			"The parameter can be used only during resource creation.")
@@ -764,14 +774,21 @@ func StorageVolumeSchema() map[string]schema.Attribute {
 			},
 		},
 		"capacity_bytes": schema.Int64Attribute{
+            CustomType: models.CapacityByteType{},
 			Description:         "Volume capacity in bytes.",
 			MarkdownDescription: "Volume capacity in bytes. If not specified during creation, volume will have maximum size calculated from chosen disks.",
 			Optional:            true,
 			Computed:            true,
-			Validators: []validator.Int64{
-				int64validator.AtLeast(10000000), // 10MB
-			},
 		},
+//		"capacity_bytes": schema.Int64Attribute{
+//			Description:         "Volume capacity in bytes.",
+//			MarkdownDescription: "Volume capacity in bytes. If not specified during creation, volume will have maximum size calculated from chosen disks.",
+//			Optional:            true,
+//			Computed:            true,
+//	Validators: []validator.Int64{
+//		int64validator.AtLeast(10000000), // 10MB
+//	},
+//		},
 		"name": schema.StringAttribute{
 			Optional:            true,
 			Description:         "Volume name",

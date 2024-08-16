@@ -1,8 +1,105 @@
 package models
 
 import (
-    "github.com/hashicorp/terraform-plugin-framework/types"
+	"context"
+    "fmt"
+
+	"github.com/hashicorp/terraform-plugin-framework/attr"
+	"github.com/hashicorp/terraform-plugin-framework/diag"
+	"github.com/hashicorp/terraform-plugin-framework/types"
+	"github.com/hashicorp/terraform-plugin-framework/types/basetypes"
+	"github.com/hashicorp/terraform-plugin-go/tftypes"
 )
+
+type CapacityByteValue struct {
+    basetypes.Int64Value
+}
+
+var _ basetypes.Int64Valuable = CapacityByteValue{}
+var _ basetypes.Int64ValuableWithSemanticEquals = CapacityByteValue{}
+var _ basetypes.Int64Typable = CapacityByteType{}
+
+type CapacityByteType struct {
+    basetypes.Int64Type
+}
+
+func (t CapacityByteType) Equal(o attr.Type) bool {
+    return true
+}
+
+func (t CapacityByteType) String() string {
+    return "CapacityByteType"
+}
+
+func (t CapacityByteType) ValueFromInt64(ctx context.Context, in basetypes.Int64Value) (basetypes.Int64Valuable, diag.Diagnostics) {
+    value := CapacityByteValue{
+        Int64Value: in,
+    }
+
+    return value, nil
+}
+
+func (t CapacityByteType) ValueFromTerraform(ctx context.Context, in tftypes.Value) (attr.Value, error) {
+    attrValue, err := t.Int64Type.ValueFromTerraform(ctx, in)
+
+    if err != nil {
+        return nil, err
+    }
+
+    stringValue, ok := attrValue.(basetypes.Int64Value)
+
+    if !ok {
+        return nil, fmt.Errorf("unexpected value type of %T", attrValue)
+    }
+
+    stringValuable, diags := t.ValueFromInt64(ctx, stringValue)
+
+    if diags.HasError() {
+        return nil, fmt.Errorf("unexpected error converting Int64Value to IntValuable: %v", diags)
+    }
+
+    return stringValuable, nil
+}
+
+func (v CapacityByteType) ValueType(ctx context.Context) attr.Value {
+    return CapacityByteValue{}
+}
+
+func (v CapacityByteValue) Int64SemanticEquals(_ context.Context, newValueable basetypes.Int64Valuable) (bool, diag.Diagnostics) {
+    var diags diag.Diagnostics
+    newValue, ok := newValueable.(CapacityByteValue)
+    if !ok {
+        diags.AddError("Semantics equality check error", "")
+        return false, diags
+    }
+
+    diff := v.Int64Value.ValueInt64() - newValue.ValueInt64()
+    if (diff < 50000000) {
+        diags.AddWarning("Int64SemanticsEquals", "Difference is ok!")
+        return true, diags
+    }
+
+    diags.AddError("Int64SemanticsEquals", "Difference too big")
+    return false, diags
+}
+
+func (v CapacityByteValue) Equal(o attr.Value) bool {
+    newValue, ok := o.(CapacityByteValue)
+    if !ok {
+        return false
+    }
+
+    diff := v.Int64Value.ValueInt64() - newValue.ValueInt64()
+    if (diff < 50000000) {
+        return true
+    }
+
+    return false
+}
+
+func (v CapacityByteValue) Type(ctx context.Context) attr.Type {
+    return CapacityByteType{}
+}
 
 // VirtualMediaResourceModel describes the resource data model.
 type StorageVolumeResourceModel struct {
@@ -11,7 +108,7 @@ type StorageVolumeResourceModel struct {
     RedfishServer        []RedfishServer `tfsdk:"server"`
 
     RaidType             types.String `tfsdk:"raid_type"`
-    CapacityBytes        types.Int64 `tfsdk:"capacity_bytes"`
+    CapacityBytes        CapacityByteValue `tfsdk:"capacity_bytes"`
     VolumeName           types.String `tfsdk:"name"`
     InitMode             types.String `tfsdk:"init_mode"`
     PhysicalDrives       types.List `tfsdk:"physical_drives"`
