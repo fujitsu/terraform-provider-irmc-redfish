@@ -234,7 +234,7 @@ func changePowerState(service *gofish.Service, powerOn bool, timeout int64) erro
             return nil
         } else {
             operation = redfish.ForceOffResetType
-            expectedTargetState = true
+            expectedTargetState = false
         }
     }
 
