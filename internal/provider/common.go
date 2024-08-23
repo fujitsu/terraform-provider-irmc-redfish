@@ -3,6 +3,7 @@ package provider
 import (
     "errors"
     "fmt"
+    "time"
 	"terraform-provider-irmc-redfish/internal/models"
 
 	"github.com/hashicorp/terraform-plugin-framework-validators/listvalidator"
@@ -10,6 +11,7 @@ import (
 	resourceSchema "github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/stmcginnis/gofish"
+	"github.com/stmcginnis/gofish/redfish"
 )
 
 const (
@@ -148,4 +150,118 @@ func ConnectTargetSystem(pconfig *IrmcProvider, rserver *[]models.RedfishServer)
 	}
 
 	return api, nil
+}
+
+// GetSystemResource returns ComputerSystem resource from target defined by service
+func GetSystemResource(service *gofish.Service) (*redfish.ComputerSystem, error) {
+	systems, err := service.Systems()
+	if err != nil {
+		return nil, err
+	}
+
+	for _, system := range systems {
+		if system.ID == "0" { // at the moment only one specific 0 is supported
+			return system, nil
+		}
+	}
+
+	return nil, fmt.Errorf("Requested System resource has not been found on list")
+}
+
+// isPoweredOn returns information whether host defined by service is powered on or not
+func isPoweredOn(service *gofish.Service) (bool, error) {
+    system, err := GetSystemResource(service)
+    if err != nil {
+        return false, err
+    }
+
+    if system.PowerState == redfish.OnPowerState {
+        return true, nil
+    }
+
+    return false, nil
+}
+
+// waitUntilHostStateChanged waits with timeout until expectedPoweredOn will be reached
+// by target defined as service
+func waitUntilHostStateChanged(service *gofish.Service, expectedPoweredOn bool, timeout int64) (bool, error) {
+    startTime := time.Now().Unix()
+    for {
+        poweredOn, err := isPoweredOn(service)
+        if err != nil {
+            return false, err
+        }
+
+        if expectedPoweredOn {
+            if poweredOn {
+                return true, nil
+            }
+        } else {
+            if !poweredOn {
+                return true, nil
+            }
+        }
+
+        if (time.Now().Unix() - startTime > timeout) {
+            return false, fmt.Errorf("Host state has not been changed within given timeout %d", timeout)
+        }
+
+        time.Sleep(2 * time.Second)
+    }
+}
+
+// changePowerState tries to change host state to value defined in powerOn with timeout
+// when requested power state should be reached
+func changePowerState(service *gofish.Service, powerOn bool, timeout int64) error {
+    system, err := GetSystemResource(service)
+    if err != nil {
+        return err
+    }
+
+    isPoweredOn, err := isPoweredOn(service)
+    if err != nil {
+        return err
+    }
+
+    operation := redfish.OnResetType
+    expectedTargetState := true
+    if powerOn == true {
+        if isPoweredOn {
+            return nil
+        }
+    } else {
+        if !isPoweredOn {
+            return nil
+        } else {
+            operation = redfish.ForceOffResetType
+            expectedTargetState = false
+        }
+    }
+
+    err = system.Reset(operation)
+    if err != nil {
+        return err
+    }
+
+    _, err = waitUntilHostStateChanged(service, expectedTargetState, timeout)
+    if err != nil {
+        return err
+    }
+
+    return nil
+}
+
+// resetHost calls host reset using resetType defined by caller
+func resetHost(service *gofish.Service, resetType redfish.ResetType) error {
+    system, err := GetSystemResource(service)
+    if err != nil {
+        return err
+    }
+
+    err = system.Reset(resetType)
+    if err != nil {
+        return err
+    }
+
+    return nil
 }
