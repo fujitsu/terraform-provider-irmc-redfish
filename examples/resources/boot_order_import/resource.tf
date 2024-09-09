@@ -6,6 +6,6 @@ resource "irmc-redfish_boot_order" "bo" {
     ssl_insecure = true
   }
 
-  boot_order = []
+  boot_order        = []
   system_reset_type = "ForceRestart"
 }
