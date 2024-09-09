@@ -4,13 +4,13 @@
 package provider
 
 import (
-    "encoding/json"
+	"encoding/json"
 	"fmt"
-    "time"
 	"io"
+	"log"
 	"os"
-    "log"
 	"testing"
+	"time"
 
 	"github.com/hashicorp/terraform-plugin-framework/providerserver"
 	"github.com/hashicorp/terraform-plugin-go/tfprotov6"
@@ -19,14 +19,14 @@ import (
 )
 
 var (
-    creds TestingServerCredentials
+	creds TestingServerCredentials
 )
 
 type TestingServerCredentials struct {
-    Username string
-    Password string
-    Endpoint string
-    Insecure bool
+	Username string
+	Password string
+	Endpoint string
+	Insecure bool
 }
 
 // testAccProtoV6ProviderFactories are used to instantiate a provider during
@@ -44,82 +44,102 @@ func testAccPreCheck(t *testing.T) {
 }
 
 type vmediaType struct {
-    MaxDev int `json:"MaximumNumberOfDevices"`
-    FreeDev int `json:"NumberOfFreeDevices"`
+	MaxDev  int `json:"MaximumNumberOfDevices"`
+	FreeDev int `json:"NumberOfFreeDevices"`
 }
 
 type vmediaConfig struct {
-    Active bool `json:"RemoteMountEnabled"`
-    CdConfig vmediaType `json:"CDImage"`
-    HdConfig vmediaType `json:"HDImage"`
-    Etag string `json:"@odata.etag"`
+	Active   bool       `json:"RemoteMountEnabled"`
+	CdConfig vmediaType `json:"CDImage"`
+	HdConfig vmediaType `json:"HDImage"`
+	Etag     string     `json:"@odata.etag"`
 }
 
 func testAccPrepareVMediaSlots(creds TestingServerCredentials) {
-    clientConfig := gofish.ClientConfig{
-        Endpoint: "https://" + creds.Endpoint,
-        Username: creds.Username,
-        Password: creds.Password,
-        BasicAuth: true,
-        Insecure: true,
-    }
+	clientConfig := gofish.ClientConfig{
+		Endpoint:  "https://" + creds.Endpoint,
+		Username:  creds.Username,
+		Password:  creds.Password,
+		BasicAuth: true,
+		Insecure:  true,
+	}
 
-    api, err := gofish.Connect(clientConfig)
-    if err != nil {
-        log.Printf("Connect to %s reported error %s", clientConfig.Endpoint, err.Error())
-        return
-    }
+	api, err := gofish.Connect(clientConfig)
+	if err != nil {
+		log.Printf("Connect to %s reported error %s", clientConfig.Endpoint, err.Error())
+		return
+	}
 
-    path := "/redfish/v1/Systems/0/Oem/ts_fujitsu/VirtualMedia"
-    resp, err := api.Get(path)
-    if err != nil {
-        log.Printf("GET on %s reported error %s", path, err.Error())
-        return
-    }
+	path := "/redfish/v1/Systems/0/Oem/ts_fujitsu/VirtualMedia"
+	resp, err := api.Get(path)
+	if err != nil {
+		log.Printf("GET on %s reported error %s", path, err.Error())
+		return
+	}
 
-    if resp.StatusCode == 200 {
-        bodyBytes, err := io.ReadAll(resp.Body)
-        if err != nil {
-            return
-        }
+	if resp.StatusCode == 200 {
+		bodyBytes, err := io.ReadAll(resp.Body)
+		if err != nil {
+			return
+		}
 
-        var config vmediaConfig
+		var config vmediaConfig
 
-        err = json.Unmarshal(bodyBytes, &config)
-        if err != nil {
-            log.Printf("Error while converting body to json (unmarshalling)")
-            return
-        }
+		err = json.Unmarshal(bodyBytes, &config)
+		if err != nil {
+			log.Printf("Error while converting body to json (unmarshalling)")
+			return
+		}
 
-        if config.CdConfig.MaxDev < 2 || config.HdConfig.MaxDev < 2 {
-            config.CdConfig.MaxDev = 4
-            config.HdConfig.MaxDev = 4
+		if config.CdConfig.MaxDev < 2 || config.HdConfig.MaxDev < 2 {
+			config.CdConfig.MaxDev = 4
+			config.HdConfig.MaxDev = 4
 
-            headers := map[string]string{"If-Match": config.Etag}
-            resp, err := api.PatchWithHeaders(path, config, headers)
-            if err != nil {
-                log.Printf("PATCH on %s reported error '%s'", path, err.Error())
-                return
-            }
+			headers := map[string]string{"If-Match": config.Etag}
+			resp, err := api.PatchWithHeaders(path, config, headers)
+			if err != nil {
+				log.Printf("PATCH on %s reported error '%s'", path, err.Error())
+				return
+			}
 
-            if resp.StatusCode == 200 {
-                log.Print("Vmedia slot number settings changed successfully, 10s timeout will follow now")
-                time.Sleep(10*time.Second)
-            }
-        }
-    }
+			if resp.StatusCode == 200 {
+				log.Print("Vmedia slot number settings changed successfully, 10s timeout will follow now")
+				time.Sleep(10 * time.Second)
+			}
+		}
+	}
 }
 
-func init () {
-    err := godotenv.Load("redfish_test.env")
-    if err != nil {
-        fmt.Println(err.Error())
-    }
+func testChangePowerHostState(creds TestingServerCredentials, poweredOn bool) {
+	clientConfig := gofish.ClientConfig{
+		Endpoint:  "https://" + creds.Endpoint,
+		Username:  creds.Username,
+		Password:  creds.Password,
+		BasicAuth: true,
+		Insecure:  true,
+	}
 
-    creds = TestingServerCredentials {
-        Username: os.Getenv("TF_TESTING_USERNAME"),
-        Password: os.Getenv("TF_TESTING_PASSWORD"),
-        Endpoint: os.Getenv("TF_TESTING_ENDPOINT"),
-        Insecure: false,
-    }
+	api, err := gofish.Connect(clientConfig)
+	if err != nil {
+		log.Printf("Connect to %s reported error %s", clientConfig.Endpoint, err.Error())
+		return
+	}
+
+	if err = changePowerState(api.Service, poweredOn, 100); err != nil {
+		log.Printf("Could not change power state %s", err.Error())
+	}
+}
+
+func init() {
+	err := godotenv.Load("redfish_test.env")
+	if err != nil {
+		fmt.Println(err.Error())
+	}
+
+	creds = TestingServerCredentials{
+		Username: os.Getenv("TF_TESTING_USERNAME"),
+		Password: os.Getenv("TF_TESTING_PASSWORD"),
+		Endpoint: os.Getenv("TF_TESTING_ENDPOINT"),
+		Insecure: false,
+	}
 }

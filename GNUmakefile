@@ -9,9 +9,10 @@ NAMESPACE=fujitsu
 default: testacc
 
 # Run acceptance tests
+# to run choosen tests: TESTARGS="-run *TestName*" make testacc
 .PHONY: testacc
 testacc:
-	TF_ACC=1 go test ./... -v $(TESTARGS) -timeout 120m
+	TF_ACC=1 TF_LOG=INFO go test ./... $(TESTARGS) -timeout 120m -count=1
 
 .PHONY: lint
 lint:
@@ -20,6 +21,10 @@ lint:
 .PHONY: doc
 doc:
 	go generate
+
+.PHONY: fmt
+fmt:
+	gofmt -w internal/
 
 .PHONY: build
 build:
@@ -30,7 +35,3 @@ build:
 install: build
 	mkdir -p $(INSTALL_ROOT)/${HOSTNAME}/${NAMESPACE}/${PROVIDER_NAME}/${VERSION}/${OS_ARCH}
 	mv $(CURDIR)/bin/${OS_ARCH}/${BINARY}_v$(VERSION) $(INSTALL_ROOT)/${HOSTNAME}/${NAMESPACE}/${PROVIDER_NAME}/${VERSION}/${OS_ARCH}
-
-.PHONY: testacc
-testacc:
-	TF_ACC=1 TF_LOG=INFO go test -v ./...

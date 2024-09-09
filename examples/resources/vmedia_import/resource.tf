@@ -8,8 +8,8 @@ resource "irmc-redfish_virtual_media" "vm" {
   #    }
   server {
     username     = "admin"
-    password     = "admin"
-    endpoint     = "https://10.172.201.188"
+    password     = "adminADMIN123"
+    endpoint     = "https://10.172.201.40"
     ssl_insecure = true
   }
 

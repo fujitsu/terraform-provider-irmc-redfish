@@ -40,7 +40,7 @@ type IrmcProviderModel struct {
 }
 
 func (p *IrmcProvider) Metadata(ctx context.Context, req provider.MetadataRequest, resp *provider.MetadataResponse) {
-    resp.TypeName = "irmc-redfish_"
+	resp.TypeName = "irmc-redfish_"
 	resp.Version = p.version
 }
 
@@ -108,7 +108,8 @@ func (p *IrmcProvider) Configure(ctx context.Context, req provider.ConfigureRequ
 
 func (p *IrmcProvider) Resources(ctx context.Context) []func() resource.Resource {
 	return []func() resource.Resource{
-        NewVirtualMediaResource,
+		NewVirtualMediaResource,
+		NewBootOrderResource,
 	}
 }
 

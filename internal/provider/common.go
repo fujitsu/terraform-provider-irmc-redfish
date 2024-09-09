@@ -1,10 +1,10 @@
 package provider
 
 import (
-    "errors"
-    "fmt"
-    "time"
+	"errors"
+	"fmt"
 	"terraform-provider-irmc-redfish/internal/models"
+	"time"
 
 	"github.com/hashicorp/terraform-plugin-framework-validators/listvalidator"
 	datasourceSchema "github.com/hashicorp/terraform-plugin-framework/datasource/schema"
@@ -15,22 +15,28 @@ import (
 )
 
 const (
-	redfishServerMD string = "List of server BMCs and their respective user credentials"
-    vmediaName string = "virtual_media"
-    storageVolumeName string = "storage_volume"
+	redfishServerMD   string = "List of server BMCs and their respective user credentials"
+	vmediaName        string = "virtual_media"
+	bootOrderName     string = "boot_order"
+	storageVolumeName string = "storage_volume"
 )
 
 type ServerConfig struct {
-    Username string `json:"username"`
-    Password string `json:"password"`
-    Endpoint string `json:"endpoint"`
-    SslInsecure bool `json:"ssl_insecure"`
+	Username    string `json:"username"`
+	Password    string `json:"password"`
+	Endpoint    string `json:"endpoint"`
+	SslInsecure bool   `json:"ssl_insecure"`
+}
+
+type CommonImportConfig struct {
+	ServerConfig
+	ID string `json:"id"`
 }
 
 // RedfishServerDatasourceSchema to construct schema of redfish server
 func RedfishServerDatasourceSchema() map[string]datasourceSchema.Attribute {
 	return map[string]datasourceSchema.Attribute{
-        "username": datasourceSchema.StringAttribute{
+		"username": datasourceSchema.StringAttribute{
 			Optional:    true,
 			Description: "User name for login",
 		},
@@ -52,7 +58,7 @@ func RedfishServerDatasourceSchema() map[string]datasourceSchema.Attribute {
 
 func RedfishServerSchema() map[string]resourceSchema.Attribute {
 	return map[string]resourceSchema.Attribute{
-        "username": resourceSchema.StringAttribute{
+		"username": resourceSchema.StringAttribute{
 			Required:    true,
 			Description: "User name for login",
 		},
@@ -75,7 +81,7 @@ func RedfishServerSchema() map[string]resourceSchema.Attribute {
 // RedfishServerDatasourceBlockMap to construct common lock map for data sources
 func RedfishServerDatasourceBlockMap() map[string]datasourceSchema.Block {
 	return map[string]datasourceSchema.Block{
-        "server": datasourceSchema.ListNestedBlock{
+		"server": datasourceSchema.ListNestedBlock{
 			MarkdownDescription: redfishServerMD,
 			Description:         redfishServerMD,
 			Validators: []validator.List{
@@ -90,19 +96,19 @@ func RedfishServerDatasourceBlockMap() map[string]datasourceSchema.Block {
 }
 
 func RedfishServerResourceBlockMap() map[string]resourceSchema.Block {
-    return map[string]resourceSchema.Block{
-        "server": resourceSchema.ListNestedBlock{
-            MarkdownDescription: redfishServerMD,
-            Description:         redfishServerMD,
-            Validators: []validator.List{
-                listvalidator.SizeAtMost(1),
-                listvalidator.IsRequired(),
-            },
-            NestedObject: resourceSchema.NestedBlockObject{
-                Attributes: RedfishServerSchema(),
-            },
-        },
-    }
+	return map[string]resourceSchema.Block{
+		"server": resourceSchema.ListNestedBlock{
+			MarkdownDescription: redfishServerMD,
+			Description:         redfishServerMD,
+			Validators: []validator.List{
+				listvalidator.SizeAtMost(1),
+				listvalidator.IsRequired(),
+			},
+			NestedObject: resourceSchema.NestedBlockObject{
+				Attributes: RedfishServerSchema(),
+			},
+		},
+	}
 }
 
 func ConnectTargetSystem(pconfig *IrmcProvider, rserver *[]models.RedfishServer) (*gofish.APIClient, error) {
@@ -170,98 +176,98 @@ func GetSystemResource(service *gofish.Service) (*redfish.ComputerSystem, error)
 
 // isPoweredOn returns information whether host defined by service is powered on or not
 func isPoweredOn(service *gofish.Service) (bool, error) {
-    system, err := GetSystemResource(service)
-    if err != nil {
-        return false, err
-    }
+	system, err := GetSystemResource(service)
+	if err != nil {
+		return false, err
+	}
 
-    if system.PowerState == redfish.OnPowerState {
-        return true, nil
-    }
+	if system.PowerState == redfish.OnPowerState {
+		return true, nil
+	}
 
-    return false, nil
+	return false, nil
 }
 
 // waitUntilHostStateChanged waits with timeout until expectedPoweredOn will be reached
 // by target defined as service
 func waitUntilHostStateChanged(service *gofish.Service, expectedPoweredOn bool, timeout int64) (bool, error) {
-    startTime := time.Now().Unix()
-    for {
-        poweredOn, err := isPoweredOn(service)
-        if err != nil {
-            return false, err
-        }
+	startTime := time.Now().Unix()
+	for {
+		poweredOn, err := isPoweredOn(service)
+		if err != nil {
+			return false, err
+		}
 
-        if expectedPoweredOn {
-            if poweredOn {
-                return true, nil
-            }
-        } else {
-            if !poweredOn {
-                return true, nil
-            }
-        }
+		if expectedPoweredOn {
+			if poweredOn {
+				return true, nil
+			}
+		} else {
+			if !poweredOn {
+				return true, nil
+			}
+		}
 
-        if (time.Now().Unix() - startTime > timeout) {
-            return false, fmt.Errorf("Host state has not been changed within given timeout %d", timeout)
-        }
+		if time.Now().Unix()-startTime > timeout {
+			return false, fmt.Errorf("Host state has not been changed within given timeout %d", timeout)
+		}
 
-        time.Sleep(2 * time.Second)
-    }
+		time.Sleep(2 * time.Second)
+	}
 }
 
 // changePowerState tries to change host state to value defined in powerOn with timeout
 // when requested power state should be reached
 func changePowerState(service *gofish.Service, powerOn bool, timeout int64) error {
-    system, err := GetSystemResource(service)
-    if err != nil {
-        return err
-    }
+	system, err := GetSystemResource(service)
+	if err != nil {
+		return err
+	}
 
-    isPoweredOn, err := isPoweredOn(service)
-    if err != nil {
-        return err
-    }
+	isPoweredOn, err := isPoweredOn(service)
+	if err != nil {
+		return err
+	}
 
-    operation := redfish.OnResetType
-    expectedTargetState := true
-    if powerOn == true {
-        if isPoweredOn {
-            return nil
-        }
-    } else {
-        if !isPoweredOn {
-            return nil
-        } else {
-            operation = redfish.ForceOffResetType
-            expectedTargetState = false
-        }
-    }
+	operation := redfish.OnResetType
+	expectedTargetState := true
+	if powerOn == true {
+		if isPoweredOn {
+			return nil
+		}
+	} else {
+		if !isPoweredOn {
+			return nil
+		} else {
+			operation = redfish.ForceOffResetType
+			expectedTargetState = false
+		}
+	}
 
-    err = system.Reset(operation)
-    if err != nil {
-        return err
-    }
+	err = system.Reset(operation)
+	if err != nil {
+		return err
+	}
 
-    _, err = waitUntilHostStateChanged(service, expectedTargetState, timeout)
-    if err != nil {
-        return err
-    }
+	_, err = waitUntilHostStateChanged(service, expectedTargetState, timeout)
+	if err != nil {
+		return err
+	}
 
-    return nil
+	return nil
 }
 
 // resetHost calls host reset using resetType defined by caller
 func resetHost(service *gofish.Service, resetType redfish.ResetType) error {
-    system, err := GetSystemResource(service)
-    if err != nil {
-        return err
-    }
+	system, err := GetSystemResource(service)
+	if err != nil {
+		return err
+	}
 
-    err = system.Reset(resetType)
-    if err != nil {
-        return err
-    }
+	err = system.Reset(resetType)
+	if err != nil {
+		return err
+	}
 
-    return nil
+	return nil
 }
