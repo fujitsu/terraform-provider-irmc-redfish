@@ -1,15 +1,15 @@
 package provider
 
 import (
-    "errors"
-    "fmt"
-    "io"
+	"errors"
+	"fmt"
+	"io"
 	"net/http"
 	"terraform-provider-irmc-redfish/internal/models"
 
-	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework-validators/listvalidator"
 	datasourceSchema "github.com/hashicorp/terraform-plugin-framework/datasource/schema"
+	"github.com/hashicorp/terraform-plugin-framework/diag"
 	resourceSchema "github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/stmcginnis/gofish"
@@ -17,22 +17,22 @@ import (
 )
 
 const (
-	redfishServerMD string = "List of server BMCs and their respective user credentials"
-    vmediaName string = "virtual_media"
-    storageVolumeName string = "storage_volume"
+	redfishServerMD   string = "List of server BMCs and their respective user credentials"
+	vmediaName        string = "virtual_media"
+	storageVolumeName string = "storage_volume"
 )
 
 type ServerConfig struct {
-    Username string `json:"username"`
-    Password string `json:"password"`
-    Endpoint string `json:"endpoint"`
-    SslInsecure bool `json:"ssl_insecure"`
+	Username    string `json:"username"`
+	Password    string `json:"password"`
+	Endpoint    string `json:"endpoint"`
+	SslInsecure bool   `json:"ssl_insecure"`
 }
 
 // RedfishServerDatasourceSchema to construct schema of redfish server
 func RedfishServerDatasourceSchema() map[string]datasourceSchema.Attribute {
 	return map[string]datasourceSchema.Attribute{
-        "username": datasourceSchema.StringAttribute{
+		"username": datasourceSchema.StringAttribute{
 			Optional:    true,
 			Description: "User name for login",
 		},
@@ -54,7 +54,7 @@ func RedfishServerDatasourceSchema() map[string]datasourceSchema.Attribute {
 
 func RedfishServerSchema() map[string]resourceSchema.Attribute {
 	return map[string]resourceSchema.Attribute{
-        "username": resourceSchema.StringAttribute{
+		"username": resourceSchema.StringAttribute{
 			Required:    true,
 			Description: "User name for login",
 		},
@@ -77,7 +77,7 @@ func RedfishServerSchema() map[string]resourceSchema.Attribute {
 // RedfishServerDatasourceBlockMap to construct common lock map for data sources
 func RedfishServerDatasourceBlockMap() map[string]datasourceSchema.Block {
 	return map[string]datasourceSchema.Block{
-        "server": datasourceSchema.ListNestedBlock{
+		"server": datasourceSchema.ListNestedBlock{
 			MarkdownDescription: redfishServerMD,
 			Description:         redfishServerMD,
 			Validators: []validator.List{
@@ -92,19 +92,19 @@ func RedfishServerDatasourceBlockMap() map[string]datasourceSchema.Block {
 }
 
 func RedfishServerResourceBlockMap() map[string]resourceSchema.Block {
-    return map[string]resourceSchema.Block{
-        "server": resourceSchema.ListNestedBlock{
-            MarkdownDescription: redfishServerMD,
-            Description:         redfishServerMD,
-            Validators: []validator.List{
-                listvalidator.SizeAtMost(1),
-                listvalidator.IsRequired(),
-            },
-            NestedObject: resourceSchema.NestedBlockObject{
-                Attributes: RedfishServerSchema(),
-            },
-        },
-    }
+	return map[string]resourceSchema.Block{
+		"server": resourceSchema.ListNestedBlock{
+			MarkdownDescription: redfishServerMD,
+			Description:         redfishServerMD,
+			Validators: []validator.List{
+				listvalidator.SizeAtMost(1),
+				listvalidator.IsRequired(),
+			},
+			NestedObject: resourceSchema.NestedBlockObject{
+				Attributes: RedfishServerSchema(),
+			},
+		},
+	}
 }
 
 func ConnectTargetSystem(pconfig *IrmcProvider, rserver *[]models.RedfishServer) (*gofish.APIClient, error) {
@@ -236,5 +236,3 @@ func FetchRedfishTaskLog(service *gofish.Service, location string) (logs []byte,
 		return nil, diags
 	}
 }
-
-
