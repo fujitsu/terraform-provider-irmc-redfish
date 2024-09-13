@@ -16,19 +16,14 @@ import (
 
 	"terraform-provider-irmc-redfish/internal/models"
 
-	//	"github.com/hashicorp/terraform-plugin-framework-validators/int64validator"
 	"github.com/hashicorp/terraform-plugin-framework-validators/listvalidator"
 	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
-//	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/diag"
-//	"github.com/hashicorp/terraform-plugin-framework/types/basetypes"
-
-	//	"github.com/hashicorp/terraform-plugin-framework/types/basetypes"
-
-	//	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/int64planmodifier"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/listplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringdefault"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
@@ -42,8 +37,6 @@ import (
 
 var _ resource.Resource = &StorageVolumeResource{}
 var _ resource.ResourceWithImportState = &StorageVolumeResource{}
-
-
 
 func NewStorageVolumeResource() resource.Resource {
 	return &StorageVolumeResource{}
@@ -96,15 +89,6 @@ func (r *StorageVolumeResource) updateStorageVolumeState(
 	target_volume_state models.StorageVolumeResourceModel,
 	volume_endpoint string) models.StorageVolumeResourceModel {
 
-	// Usually if volume is created, size of the volume is not exactly
-	// the same as requested due to controller (values in bytes can be rounded).
-    // Value from plan is applied to state and the property should be NOT taken into account
-	// when differences are checked (lifecycle definition in resource)
-	capacity_bytes := plan.CapacityBytes // FIXME
-//	if plan.CapacityBytes.IsUnknown() {
-		capacity_bytes = target_volume_state.CapacityBytes
-//	}
-
 	return models.StorageVolumeResourceModel{
 		Id:        types.StringValue(volume_endpoint),
 		StorageId: plan.StorageId,
@@ -115,12 +99,11 @@ func (r *StorageVolumeResource) updateStorageVolumeState(
 		PhysicalDrives:     plan.PhysicalDrives,
 		OptimumIOSizeBytes: plan.OptimumIOSizeBytes,
 
-		CapacityBytes: capacity_bytes,
+		CapacityBytes: target_volume_state.CapacityBytes,
 
 		// Property marked as Computed are expected to return real values
 		ReadMode:  target_volume_state.ReadMode,
 		WriteMode: target_volume_state.WriteMode,
-		//        CacheMode: target_volume_state.CacheMode,
 
 		DriveCacheMode: plan.DriveCacheMode,
 
@@ -372,7 +355,6 @@ func getNewVolumeConfigFromPlan(plan models.StorageVolumeResourceModel,
 	// Handle optional arguments if not provided by user, do not add them to request as 0
 	// as it might make more problems than benefits
 	capacity := plan.CapacityBytes.ValueInt64()
-//    capacity := plan.CapacityBytes.Int64Value // FIXME: AZ2
 	if capacity != 0 {
 		volume_config["CapacityBytes"] = capacity
 	}
@@ -381,13 +363,6 @@ func getNewVolumeConfigFromPlan(plan models.StorageVolumeResourceModel,
 	if stripe_size != 0 {
 		volume_config["OptimumIOSizeBytes"] = stripe_size
 	}
-
-	/*
-	   cache_mode := plan.CacheMode.ValueString()
-	   if cache_mode != "" {
-	       volume_config["CacheMode"] = cache_mode
-	   }
-	*/
 
 	return volume_config
 }
@@ -431,14 +406,14 @@ func WaitForRedfishTaskEnd(ctx context.Context, service *gofish.Service, locatio
 func getVolumesIdsList(service *gofish.Service, storage_id string) (out []string, diags diag.Diagnostics) {
 	storage, err := GetSystemStorageResource(service, storage_id)
 	if err != nil {
-        diags.AddError("Could not obtain storage controller with requested id", err.Error())
-        return
+		diags.AddError("Could not obtain storage controller with requested id", err.Error())
+		return
 	}
 
 	volumes, err := storage.Volumes()
 	if err != nil {
-        diags.AddError("Could not obtain volumes of storage controller with requested id", err.Error())
-        return
+		diags.AddError("Could not obtain volumes of storage controller with requested id", err.Error())
+		return
 	}
 
 	for _, volume := range volumes {
@@ -564,23 +539,23 @@ func doesVolumeStillExist(service *gofish.Service, volume_endpoint string) (volu
 
 // getStorageIdFromVolumeODataId tries to read storage id out of volumeOdataId
 func getStorageIdFromVolumeODataId(volumeOdataId string) string {
-    suffix := strings.Index(volumeOdataId, "/Volume")
-    output := volumeOdataId[:suffix]
+	suffix := strings.Index(volumeOdataId, "/Volume")
+	output := volumeOdataId[:suffix]
 
-    prefix := strings.LastIndex(output, "/")
-    output = output[prefix+1:]
+	prefix := strings.LastIndex(output, "/")
+	output = output[prefix+1:]
 
-    return output
+	return output
 }
 
 // readStorageVolumeToState reads current volume configuration to terraform state
 func readStorageVolumeToState(volume *redfish.Volume, state *models.StorageVolumeResourceModel) (diags diag.Diagnostics) {
-    state.StorageId = types.StringValue(getStorageIdFromVolumeODataId(volume.ODataID))
+
+	state.StorageId = types.StringValue(getStorageIdFromVolumeODataId(volume.ODataID))
 	state.VolumeName = types.StringValue(volume.Name)
 	state.OptimumIOSizeBytes = types.Int64Value(int64(volume.OptimumIOSizeBytes))
 
-//    state.CapacityBytes = types.Int64Value(int64(volume.CapacityBytes)) // FIXME:
-    state.CapacityBytes = models.CapacityByteValue{types.Int64Value(int64(volume.CapacityBytes))}
+	state.CapacityBytes = models.CapacityByteValue{types.Int64Value(int64(volume.CapacityBytes))}
 
 	// Theoretically volume can be migrated to different RAID type
 	state.RaidType = types.StringValue(string(volume.RAIDType))
@@ -635,58 +610,6 @@ func compareVolumePropertiesWithPlan(ctx context.Context, service *gofish.Servic
 
 		time.Sleep(2 * time.Second)
 	}
-}
-
-// verifyUpdateStorageVolumePlan verifies what changes are acceptable between current state and plan.
-// If any planned change cannot be executed diagnostic errors are returned
-func verifyUpdateStorageVolumePlan(ctx context.Context, state *models.StorageVolumeResourceModel,
-	plan *models.StorageVolumeResourceModel) diag.Diagnostics {
-
-	var diags diag.Diagnostics
-
-	if plan.RaidType != state.RaidType {
-		diags.AddError("RAIDType of existing volume cannot be changed",
-			"Existing RAIDType of volume cannot be modified.")
-		return diags
-	}
-
-	if plan.InitMode != state.InitMode {
-		diags.AddError("init_mode of existing volume cannot be changed",
-			"The parameter can be used only during resource creation.")
-		return diags
-	}
-
-	if plan.ReadMode != state.ReadMode {
-		diags.AddError("read_mode of existing volume cannot be changed",
-			"The parameter can be used only during resource creation.")
-		return diags
-	}
-
-	if plan.WriteMode != state.WriteMode {
-		diags.AddError("write_mode of existing volume cannot be changed",
-			"The parameter can be used only during resource creation.")
-		return diags
-	}
-
-    // FIXME: AZ2
-	if !(plan.CapacityBytes.IsUnknown()) && plan.CapacityBytes != state.CapacityBytes {
-		diags.AddError("capacity_bytes of existing volume cannot be changed",
-			"The parameter can be used only during resource creation.")
-		return diags
-	}
-
-	var plan_physical_disks, state_physical_disks []string
-	plan.PhysicalDrives.ElementsAs(ctx, &plan_physical_disks, true)
-	state.PhysicalDrives.ElementsAs(ctx, &state_physical_disks, true)
-
-	diff := difference(plan_physical_disks, state_physical_disks)
-	if len(diff) > 0 {
-		diags.AddError("PhysicalDrives assigned to volume cannot be changed.",
-			"Destroy and create new volume if change is needed.")
-		return diags
-	}
-
-	return diags
 }
 
 // updateStorageVolume applies change on volume properties and verifies if planned
@@ -744,8 +667,11 @@ func StorageVolumeSchema() map[string]schema.Attribute {
 		},
 		"storage_controller_id": schema.StringAttribute{
 			Required:            true,
-			Description:         "Id of storage controller. The pr",
+			Description:         "Id of storage controller.",
 			MarkdownDescription: "Id of storage controller.",
+			PlanModifiers: []planmodifier.String{
+				stringplanmodifier.RequiresReplace(),
+			},
 		},
 		"raid_type": schema.StringAttribute{
 			Required:            true,
@@ -763,6 +689,9 @@ func StorageVolumeSchema() map[string]schema.Attribute {
 					"RAID60",
 				}...),
 			},
+			PlanModifiers: []planmodifier.String{
+				stringplanmodifier.RequiresReplace(),
+			},
 		},
 		"physical_drives": schema.ListAttribute{
 			Required:            true,
@@ -772,23 +701,23 @@ func StorageVolumeSchema() map[string]schema.Attribute {
 			Validators: []validator.List{
 				listvalidator.SizeAtLeast(1), // no possibility to do more validation at this level
 			},
+			PlanModifiers: []planmodifier.List{
+				listplanmodifier.RequiresReplace(),
+			},
 		},
+		// Usually if volume is created, size of the volume is not exactly
+		// the same as requested due to controller (values in bytes can be rounded).
+		// For that reason semantic equality logic is required here.
 		"capacity_bytes": schema.Int64Attribute{
-            CustomType: models.CapacityByteType{},
+			CustomType:          models.CapacityByteType{},
 			Description:         "Volume capacity in bytes.",
 			MarkdownDescription: "Volume capacity in bytes. If not specified during creation, volume will have maximum size calculated from chosen disks.",
 			Optional:            true,
 			Computed:            true,
+			PlanModifiers: []planmodifier.Int64{
+				int64planmodifier.RequiresReplace(),
+			},
 		},
-//		"capacity_bytes": schema.Int64Attribute{
-//			Description:         "Volume capacity in bytes.",
-//			MarkdownDescription: "Volume capacity in bytes. If not specified during creation, volume will have maximum size calculated from chosen disks.",
-//			Optional:            true,
-//			Computed:            true,
-//	Validators: []validator.Int64{
-//		int64validator.AtLeast(10000000), // 10MB
-//	},
-//		},
 		"name": schema.StringAttribute{
 			Optional:            true,
 			Description:         "Volume name",
@@ -811,11 +740,17 @@ func StorageVolumeSchema() map[string]schema.Attribute {
 			},
 			Computed: true,
 			Default:  stringdefault.StaticString("None"),
+			PlanModifiers: []planmodifier.String{
+				stringplanmodifier.RequiresReplace(),
+			},
 		},
 		"optimum_io_size_bytes": schema.Int64Attribute{
 			Description:         "Optimum IO size bytes",
 			MarkdownDescription: "Optimum IO size bytes",
 			Optional:            true,
+			PlanModifiers: []planmodifier.Int64{
+				int64planmodifier.RequiresReplace(),
+			},
 		},
 		"read_mode": schema.StringAttribute{
 			Optional:            true,
@@ -829,7 +764,9 @@ func StorageVolumeSchema() map[string]schema.Attribute {
 				}...),
 			},
 			Computed: true,
-			//            Default: stringdefault.StaticString("ReadAhead"),
+			PlanModifiers: []planmodifier.String{
+				stringplanmodifier.RequiresReplace(),
+			},
 		},
 		"write_mode": schema.StringAttribute{
 			Optional:            true,
@@ -843,26 +780,10 @@ func StorageVolumeSchema() map[string]schema.Attribute {
 				}...),
 			},
 			Computed: true,
-			//            Default: stringdefault.StaticString("WriteThrough"),
+			PlanModifiers: []planmodifier.String{
+				stringplanmodifier.RequiresReplace(),
+			},
 		},
-		/*
-			        "cache_mode": schema.StringAttribute{
-			            Optional:            true,
-			            Description:         "Cache mode of volume.",
-			            MarkdownDescription: "Cache mode of volume.",
-			            Validators:         []validator.String{
-			                stringvalidator.OneOf([]string{
-			                    "Direct",
-			                    "Cached",
-			                }...),
-			            },
-			            Computed:            true,
-			            PlanModifiers: []planmodifier.String{
-							stringplanmodifier.UseStateForUnknown(),
-						},
-			//            Default: stringdefault.StaticString("Direct"),
-			        },
-		*/
 		"drive_cache_mode": schema.StringAttribute{
 			Optional:            true,
 			Description:         "Drive cache mode of volume.",
@@ -930,10 +851,10 @@ func (r *StorageVolumeResource) Create(ctx context.Context, req resource.CreateR
 
 	storage_id := plan.StorageId.ValueString()
 	volumes_ids_before, diags := getVolumesIdsList(api.Service, storage_id)
-    resp.Diagnostics.Append(diags...)
-    if diags.HasError() {
-        return
-    }
+	resp.Diagnostics.Append(diags...)
+	if diags.HasError() {
+		return
+	}
 
 	diags = createStorageVolume(ctx, api.Service, plan)
 	resp.Diagnostics.Append(diags...)
@@ -942,10 +863,10 @@ func (r *StorageVolumeResource) Create(ctx context.Context, req resource.CreateR
 	}
 
 	volumes_ids_after, diags := getVolumesIdsList(api.Service, storage_id)
-    resp.Diagnostics.Append(diags...)
-    if diags.HasError() {
-        return
-    }
+	resp.Diagnostics.Append(diags...)
+	if diags.HasError() {
+		return
+	}
 
 	new_volume_endpoint := getRecentlyCreatedVolumeId(
 		volumes_ids_after, volumes_ids_before)
@@ -1059,13 +980,6 @@ func (r *StorageVolumeResource) Update(ctx context.Context, req resource.UpdateR
 		return
 	}
 
-	// Verify requested changes
-	diags = verifyUpdateStorageVolumePlan(ctx, &state, &plan)
-	resp.Diagnostics.Append(diags...)
-	if resp.Diagnostics.HasError() {
-		return
-	}
-
 	// Connect to service
 	api, err := ConnectTargetSystem(r.p, &plan.RedfishServer)
 	if err != nil {
@@ -1166,8 +1080,8 @@ func (r *StorageVolumeResource) ImportState(ctx context.Context, req resource.Im
 		SslInsecure: types.BoolValue(config.SslInsecure),
 	}
 
-    // no need to read current configuration since terraform will call Read() once
-    // import procedure will be successfully finished
+	// no need to read current configuration since terraform will call Read() once
+	// import procedure will be successfully finished
 
 	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("id"), config.ID)...)
 	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("server"), []models.RedfishServer{server})...)

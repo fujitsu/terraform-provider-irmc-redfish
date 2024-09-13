@@ -2,7 +2,7 @@ package models
 
 import (
 	"context"
-    "fmt"
+	"fmt"
 
 	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/diag"
@@ -12,7 +12,7 @@ import (
 )
 
 type CapacityByteValue struct {
-    basetypes.Int64Value
+	basetypes.Int64Value
 }
 
 var _ basetypes.Int64Valuable = CapacityByteValue{}
@@ -20,102 +20,95 @@ var _ basetypes.Int64ValuableWithSemanticEquals = CapacityByteValue{}
 var _ basetypes.Int64Typable = CapacityByteType{}
 
 type CapacityByteType struct {
-    basetypes.Int64Type
+	basetypes.Int64Type
 }
 
 func (t CapacityByteType) Equal(o attr.Type) bool {
-    return true
+	return true
 }
 
 func (t CapacityByteType) String() string {
-    return "CapacityByteType"
+	return "CapacityByteType"
 }
 
 func (t CapacityByteType) ValueFromInt64(ctx context.Context, in basetypes.Int64Value) (basetypes.Int64Valuable, diag.Diagnostics) {
-    value := CapacityByteValue{
-        Int64Value: in,
-    }
+	value := CapacityByteValue{
+		Int64Value: in,
+	}
 
-    return value, nil
+	return value, nil
 }
 
 func (t CapacityByteType) ValueFromTerraform(ctx context.Context, in tftypes.Value) (attr.Value, error) {
-    attrValue, err := t.Int64Type.ValueFromTerraform(ctx, in)
+	attrValue, err := t.Int64Type.ValueFromTerraform(ctx, in)
 
-    if err != nil {
-        return nil, err
-    }
+	if err != nil {
+		return nil, err
+	}
 
-    stringValue, ok := attrValue.(basetypes.Int64Value)
+	intValue, ok := attrValue.(basetypes.Int64Value)
 
-    if !ok {
-        return nil, fmt.Errorf("unexpected value type of %T", attrValue)
-    }
+	if !ok {
+		return nil, fmt.Errorf("unexpected value type of %T", attrValue)
+	}
 
-    stringValuable, diags := t.ValueFromInt64(ctx, stringValue)
+	intValuable, diags := t.ValueFromInt64(ctx, intValue)
 
-    if diags.HasError() {
-        return nil, fmt.Errorf("unexpected error converting Int64Value to IntValuable: %v", diags)
-    }
+	if diags.HasError() {
+		return nil, fmt.Errorf("unexpected error converting Int64Value to IntValuable: %v", diags)
+	}
 
-    return stringValuable, nil
+	return intValuable, nil
 }
 
 func (v CapacityByteType) ValueType(ctx context.Context) attr.Value {
-    return CapacityByteValue{}
+	return CapacityByteValue{}
 }
 
 func (v CapacityByteValue) Int64SemanticEquals(_ context.Context, newValueable basetypes.Int64Valuable) (bool, diag.Diagnostics) {
-    var diags diag.Diagnostics
-    newValue, ok := newValueable.(CapacityByteValue)
-    if !ok {
-        diags.AddError("Semantics equality check error", "")
-        return false, diags
-    }
+	var diags diag.Diagnostics
+	newValue, ok := newValueable.(CapacityByteValue)
+	if !ok {
+		diags.AddError("Semantics equality check error", "")
+		return false, diags
+	}
 
-    diff := v.Int64Value.ValueInt64() - newValue.ValueInt64()
-    if (diff < 50000000) {
-        diags.AddWarning("Int64SemanticsEquals", "Difference is ok!")
-        return true, diags
-    }
+	diff := v.Int64Value.ValueInt64() - newValue.ValueInt64()
+	if diff < 50000000 {
+		//        diags.AddWarning("Int64SemanticsEquals", "Difference is ok!")
+		return true, diags
+	}
 
-    diags.AddError("Int64SemanticsEquals", "Difference too big")
-    return false, diags
+	diags.AddError("Int64SemanticsEquals", "Difference too big (>50000000 bytes)")
+	return false, diags
 }
 
 func (v CapacityByteValue) Equal(o attr.Value) bool {
-    newValue, ok := o.(CapacityByteValue)
-    if !ok {
-        return false
-    }
+	newValue, ok := o.(CapacityByteValue)
+	if !ok {
+		return false
+	}
 
-    diff := v.Int64Value.ValueInt64() - newValue.ValueInt64()
-    if (diff < 50000000) {
-        return true
-    }
-
-    return false
+	return v.Int64Value.Equal(newValue.Int64Value)
 }
 
 func (v CapacityByteValue) Type(ctx context.Context) attr.Type {
-    return CapacityByteType{}
+	return CapacityByteType{}
 }
 
 // VirtualMediaResourceModel describes the resource data model.
 type StorageVolumeResourceModel struct {
-    Id                   types.String `tfsdk:"id"`
-    StorageId            types.String `tfsdk:"storage_controller_id"`
-    RedfishServer        []RedfishServer `tfsdk:"server"`
+	Id            types.String    `tfsdk:"id"`
+	StorageId     types.String    `tfsdk:"storage_controller_id"`
+	RedfishServer []RedfishServer `tfsdk:"server"`
 
-    RaidType             types.String `tfsdk:"raid_type"`
-    CapacityBytes        CapacityByteValue `tfsdk:"capacity_bytes"`
-    VolumeName           types.String `tfsdk:"name"`
-    InitMode             types.String `tfsdk:"init_mode"`
-    PhysicalDrives       types.List `tfsdk:"physical_drives"`
-    OptimumIOSizeBytes   types.Int64 `tfsdk:"optimum_io_size_bytes"`
-    ReadMode             types.String `tfsdk:"read_mode"`
-    WriteMode            types.String `tfsdk:"write_mode"`
-//    CacheMode            types.String `tfsdk:"cache_mode"`
-    DriveCacheMode       types.String `tfsdk:"drive_cache_mode"`
+	RaidType           types.String      `tfsdk:"raid_type"`
+	CapacityBytes      CapacityByteValue `tfsdk:"capacity_bytes"`
+	VolumeName         types.String      `tfsdk:"name"`
+	InitMode           types.String      `tfsdk:"init_mode"`
+	PhysicalDrives     types.List        `tfsdk:"physical_drives"`
+	OptimumIOSizeBytes types.Int64       `tfsdk:"optimum_io_size_bytes"`
+	ReadMode           types.String      `tfsdk:"read_mode"`
+	WriteMode          types.String      `tfsdk:"write_mode"`
+	DriveCacheMode     types.String      `tfsdk:"drive_cache_mode"`
 }
-
