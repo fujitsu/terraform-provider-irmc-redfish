@@ -94,18 +94,11 @@ func TestAccRedfishIrmcPower(t *testing.T) {
 				),
 			},
 			{
+				// This test case might lead to problems when booted host OS does not have
+				// configured behavior for power button (e.g.: in Linux environment)
 				Config: testAccRedfishResourcePowerConfig(creds, "PushPowerButton", timeout),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr(resource_irmc_host_power, "power_state", "Off"),
-				),
-			},
-			{
-				PreConfig: func() {
-					time.Sleep(1 * time.Minute)
-				},
-				Config: testAccRedfishResourcePowerConfig(creds, "PushPowerButton", timeout),
-				Check: resource.ComposeAggregateTestCheckFunc(
-					resource.TestCheckResourceAttr(resource_irmc_host_power, "power_state", "On"),
 				),
 			},
 		},
