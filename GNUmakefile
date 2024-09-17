@@ -33,4 +33,4 @@ install: build
 
 .PHONY: testacc
 testacc:
-	TF_ACC=1 TF_LOG=INFO go test ./... $(TESTARGS) -timeout 120m -count=1
+	TF_ACC=1 TF_LOG=INFO go test -v ./...

@@ -1,14 +1,17 @@
 package provider
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"terraform-provider-irmc-redfish/internal/models"
+    "time"
 
 	"github.com/hashicorp/terraform-plugin-framework-validators/listvalidator"
 	datasourceSchema "github.com/hashicorp/terraform-plugin-framework/datasource/schema"
 	resourceSchema "github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
+	"github.com/hashicorp/terraform-plugin-log/tflog"
 	"github.com/stmcginnis/gofish"
 	"github.com/stmcginnis/gofish/redfish"
 )
@@ -17,6 +20,7 @@ const (
 	redfishServerMD        string = "List of server BMCs and their respective user credentials"
 	vmediaName             string = "virtual_media"
 	storageVolumeName      string = "storage_volume"
+	irmcRestart       string = "irmc_reset"
 	bootSourceOverrideName string = "boot_source_override"
 )
 
@@ -166,4 +170,24 @@ func GetSystemResource(service *gofish.Service) (*redfish.ComputerSystem, error)
 	}
 
 	return nil, fmt.Errorf("error. Requested System resource has not been found on list")
+}
+
+func retryConnectWithTimeout(ctx context.Context, pconfig *IrmcProvider, rserver *[]models.RedfishServer) (*gofish.APIClient, error) {
+	startTime := time.Now()
+	var apiClient *gofish.APIClient
+	var err error
+	timeout := 10 * time.Minute
+
+	for time.Since(startTime) < timeout {
+		apiClient, err = ConnectTargetSystem(pconfig, rserver)
+		if err == nil {
+			tflog.Info(ctx, "Successfully connected to the IRMC system.")
+			return apiClient, nil
+		}
+
+		tflog.Warn(ctx, fmt.Sprintf("Failed to connect to the IRMC system: %s. Retrying in 30 seconds...", err.Error()))
+		time.Sleep(30 * time.Second)
+	}
+
+	return nil, fmt.Errorf("connection timed out after 10 minutes: %w", err)
 }
