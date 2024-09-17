@@ -414,21 +414,19 @@ func waitTillBootOrderApplied(ctx context.Context, service *gofish.Service, plan
 	tflog.Info(ctx, logMsg)
 
 	startTime := time.Now().Unix()
+
 	if !poweredOn {
-		if err := changePowerState(service, true, timeout); err != nil {
-			diags.AddError("Host could not be powered on to finish BIOS settings", err.Error())
-			return diags
-		}
+		err = changePowerState(service, true, timeout)
 	} else {
 		resetType := (redfish.ResetType)(plan.SystemResetType.ValueString())
-		if err := resetHost(service, resetType, timeout); err != nil {
-			// Due to BIOS setting change it might happen that host will be powered off after
-			// BIOS POST phase, so to not break the process the error must be omitted
-			if err.Error() != "BIOS exited POST but host powered off" {
-				diags.AddError("Host could not be reset", err.Error())
-				return diags
-			}
-		}
+		err = resetHost(service, resetType, timeout)
+	}
+
+	// Due to BIOS setting change it might happen that host will be powered off after
+	// BIOS POST phase, so to not break the process the error must be omitted
+	if err.Error() != "BIOS exited POST but host powered off" {
+		diags.AddError("Host could not be powered on to finish BIOS settings", err.Error())
+		return diags
 	}
 
 	if time.Now().Unix()-startTime > timeout {
