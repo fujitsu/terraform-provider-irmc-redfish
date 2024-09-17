@@ -5,7 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"terraform-provider-irmc-redfish/internal/models"
-    "time"
+	"time"
 
 	"github.com/hashicorp/terraform-plugin-framework-validators/listvalidator"
 	datasourceSchema "github.com/hashicorp/terraform-plugin-framework/datasource/schema"
@@ -20,8 +20,14 @@ const (
 	redfishServerMD        string = "List of server BMCs and their respective user credentials"
 	vmediaName             string = "virtual_media"
 	storageVolumeName      string = "storage_volume"
-	irmcRestart       string = "irmc_reset"
+	irmcRestart            string = "irmc_reset"
 	bootSourceOverrideName string = "boot_source_override"
+	bootOrderName          string = "boot_order"
+)
+
+const (
+	HTTP_HEADER_IF_MATCH = "If-Match"
+	HTTP_HEADER_ETAG     = "ETag"
 )
 
 type ServerConfig struct {
@@ -29,6 +35,11 @@ type ServerConfig struct {
 	Password    string `json:"password"`
 	Endpoint    string `json:"endpoint"`
 	SslInsecure bool   `json:"ssl_insecure"`
+}
+
+type CommonImportConfig struct {
+	ServerConfig
+	ID string `json:"id"`
 }
 
 // RedfishServerDatasourceSchema to construct schema of redfish server
@@ -169,7 +180,7 @@ func GetSystemResource(service *gofish.Service) (*redfish.ComputerSystem, error)
 		}
 	}
 
-	return nil, fmt.Errorf("error. Requested System resource has not been found on list")
+	return nil, fmt.Errorf("Requested System resource has not been found on list")
 }
 
 func retryConnectWithTimeout(ctx context.Context, pconfig *IrmcProvider, rserver *[]models.RedfishServer) (*gofish.APIClient, error) {

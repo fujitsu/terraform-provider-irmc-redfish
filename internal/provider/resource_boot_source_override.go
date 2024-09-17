@@ -30,8 +30,6 @@ import (
 
 const (
 	BOOT_CONFIG_OEM_ENDPOINT = "/redfish/v1/Systems/0/Oem/ts_fujitsu/BootConfig"
-	HTTP_HEADER_IF_MATCH     = "If-Match"
-	HTTP_HEADER_ETAG         = "ETag"
 )
 
 // Ensure provider defined types fully satisfy framework interfaces.
