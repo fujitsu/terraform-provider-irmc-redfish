@@ -109,6 +109,9 @@ func (p *IrmcProvider) Configure(ctx context.Context, req provider.ConfigureRequ
 func (p *IrmcProvider) Resources(ctx context.Context) []func() resource.Resource {
 	return []func() resource.Resource{
 		NewVirtualMediaResource,
+		NewPowerResource,
+		NewIrmcRestartResource,
+		NewBootSourceOverrideResource,
 		NewBootOrderResource,
 	}
 }

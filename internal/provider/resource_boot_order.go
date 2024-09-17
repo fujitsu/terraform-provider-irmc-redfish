@@ -33,8 +33,6 @@ import (
 const (
 	PERSISTENT_BOOT_ORDER_KEY = "PersistentBootConfigOrder"
 	BIOS_SETTINGS_ENDPOINT    = "/redfish/v1/Systems/0/Bios/Settings"
-	HTTP_HEADER_IF_MATCH      = "If-Match"
-	HTTP_HEADER_ETAG          = "ETag"
 )
 
 // Ensure provider defined types fully satisfy framework interfaces.
@@ -404,35 +402,37 @@ func getBiosSettingsFutureAttributesNumber(service *gofish.Service) (length int,
 // waitTillBootOrderApplied supervises applying boot order from plan
 // and return possible errors during processing using diags
 func waitTillBootOrderApplied(ctx context.Context, service *gofish.Service, plan models.BootOrderResourceModel) (diags diag.Diagnostics) {
-	startTime := time.Now().Unix()
-	timeout := plan.JobTimeout.ValueInt64()
-	resetType := (redfish.ResetType)(plan.SystemResetType.ValueString())
-
-	var logMsg string
-	logMsg = fmt.Sprintf("Process will wait with %d seconds timeout to finish", timeout)
-	tflog.Info(ctx, logMsg)
-
 	poweredOn, err := isPoweredOn(service)
 	if err != nil {
 		diags.AddError("Could not retrieve current power state", err.Error())
 		return diags
 	}
 
-	hostResetTimeout := 120 // currently hardcoded value
+	timeout := plan.JobTimeout.ValueInt64()
+	var logMsg string
+	logMsg = fmt.Sprintf("Process will wait with %d seconds timeout to finish", timeout)
+	tflog.Info(ctx, logMsg)
+
+	startTime := time.Now().Unix()
 	if !poweredOn {
-		if err := changePowerState(service, true, int64(hostResetTimeout)); err != nil {
+		if err := changePowerState(service, true, timeout); err != nil {
 			diags.AddError("Host could not be powered on to finish BIOS settings", err.Error())
 			return diags
 		}
 	} else {
-		if err := resetHost(service, resetType); err != nil {
-			diags.AddError("Host could not be reset", err.Error())
-			return diags
+		resetType := (redfish.ResetType)(plan.SystemResetType.ValueString())
+		if err := resetHost(service, resetType, timeout); err != nil {
+			// Due to BIOS setting change it might happen that host will be powered off after
+			// BIOS POST phase, so to not break the process the error must be omitted
+			if err.Error() != "BIOS exited POST but host powered off" {
+				diags.AddError("Host could not be reset", err.Error())
+				return diags
+			}
 		}
 	}
 
 	if time.Now().Unix()-startTime > timeout {
-		diags.AddError("Job timeout exceeded while operation has not finished", "Terminate")
+		diags.AddError("Job timeout exceeded after reset/power on while operation has not finished", "Terminate")
 		return diags
 	}
 

@@ -1,6 +1,7 @@
 package provider
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"terraform-provider-irmc-redfish/internal/models"
@@ -10,15 +11,23 @@ import (
 	datasourceSchema "github.com/hashicorp/terraform-plugin-framework/datasource/schema"
 	resourceSchema "github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
+	"github.com/hashicorp/terraform-plugin-log/tflog"
 	"github.com/stmcginnis/gofish"
 	"github.com/stmcginnis/gofish/redfish"
 )
 
 const (
-	redfishServerMD   string = "List of server BMCs and their respective user credentials"
-	vmediaName        string = "virtual_media"
-	bootOrderName     string = "boot_order"
-	storageVolumeName string = "storage_volume"
+	redfishServerMD        string = "List of server BMCs and their respective user credentials"
+	vmediaName             string = "virtual_media"
+	storageVolumeName      string = "storage_volume"
+	irmcRestart            string = "irmc_reset"
+	bootSourceOverrideName string = "boot_source_override"
+	bootOrderName          string = "boot_order"
+)
+
+const (
+	HTTP_HEADER_IF_MATCH = "If-Match"
+	HTTP_HEADER_ETAG     = "ETag"
 )
 
 type ServerConfig struct {
@@ -174,100 +183,22 @@ func GetSystemResource(service *gofish.Service) (*redfish.ComputerSystem, error)
 	return nil, fmt.Errorf("Requested System resource has not been found on list")
 }
 
-// isPoweredOn returns information whether host defined by service is powered on or not
-func isPoweredOn(service *gofish.Service) (bool, error) {
-	system, err := GetSystemResource(service)
-	if err != nil {
-		return false, err
-	}
+func retryConnectWithTimeout(ctx context.Context, pconfig *IrmcProvider, rserver *[]models.RedfishServer) (*gofish.APIClient, error) {
+	startTime := time.Now()
+	var apiClient *gofish.APIClient
+	var err error
+	timeout := 10 * time.Minute
 
-	if system.PowerState == redfish.OnPowerState {
-		return true, nil
-	}
-
-	return false, nil
-}
-
-// waitUntilHostStateChanged waits with timeout until expectedPoweredOn will be reached
-// by target defined as service
-func waitUntilHostStateChanged(service *gofish.Service, expectedPoweredOn bool, timeout int64) (bool, error) {
-	startTime := time.Now().Unix()
-	for {
-		poweredOn, err := isPoweredOn(service)
-		if err != nil {
-			return false, err
+	for time.Since(startTime) < timeout {
+		apiClient, err = ConnectTargetSystem(pconfig, rserver)
+		if err == nil {
+			tflog.Info(ctx, "Successfully connected to the IRMC system.")
+			return apiClient, nil
 		}
 
-		if expectedPoweredOn {
-			if poweredOn {
-				return true, nil
-			}
-		} else {
-			if !poweredOn {
-				return true, nil
-			}
-		}
-
-		if time.Now().Unix()-startTime > timeout {
-			return false, fmt.Errorf("Host state has not been changed within given timeout %d", timeout)
-		}
-
-		time.Sleep(2 * time.Second)
-	}
-}
-
-// changePowerState tries to change host state to value defined in powerOn with timeout
-// when requested power state should be reached
-func changePowerState(service *gofish.Service, powerOn bool, timeout int64) error {
-	system, err := GetSystemResource(service)
-	if err != nil {
-		return err
+		tflog.Warn(ctx, fmt.Sprintf("Failed to connect to the IRMC system: %s. Retrying in 30 seconds...", err.Error()))
+		time.Sleep(30 * time.Second)
 	}
 
-	isPoweredOn, err := isPoweredOn(service)
-	if err != nil {
-		return err
-	}
-
-	operation := redfish.OnResetType
-	expectedTargetState := true
-	if powerOn == true {
-		if isPoweredOn {
-			return nil
-		}
-	} else {
-		if !isPoweredOn {
-			return nil
-		} else {
-			operation = redfish.ForceOffResetType
-			expectedTargetState = false
-		}
-	}
-
-	err = system.Reset(operation)
-	if err != nil {
-		return err
-	}
-
-	_, err = waitUntilHostStateChanged(service, expectedTargetState, timeout)
-	if err != nil {
-		return err
-	}
-
-	return nil
-}
-
-// resetHost calls host reset using resetType defined by caller
-func resetHost(service *gofish.Service, resetType redfish.ResetType) error {
-	system, err := GetSystemResource(service)
-	if err != nil {
-		return err
-	}
-
-	err = system.Reset(resetType)
-	if err != nil {
-		return err
-	}
-
-	return nil
+	return nil, fmt.Errorf("connection timed out after 10 minutes: %w", err)
 }
