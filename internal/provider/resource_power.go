@@ -177,19 +177,9 @@ func (r *PowerResource) Create(ctx context.Context, req resource.CreateRequest, 
 			return
 		}
 		time.Sleep(30 * time.Second)
-	case "GracefulShutdown":
-		powerErr = resetHost(config.Service, redfish.ResetType(powerAction))
-		if powerErr != nil {
-			resp.Diagnostics.AddError("Power Operation Error", powerErr.Error())
-			return
-		}
-		_, powerErr = waitUntilHostStateChanged(config.Service, false, powerPlan.MaxWaitTime.ValueInt64())
-		if powerErr != nil {
-			resp.Diagnostics.AddError("Host state has not been changed within given timeout", powerErr.Error())
-			return
-		}
 	default:
-		powerErr = resetHost(config.Service, redfish.ResetType(powerAction))
+		powerErr = resetHost(config.Service, redfish.ResetType(powerAction),
+			powerPlan.MaxWaitTime.ValueInt64())
 	}
 
 	if powerErr != nil {
