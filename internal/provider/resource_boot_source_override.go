@@ -235,26 +235,6 @@ func (r *BootSourceOverrideResource) Create(ctx context.Context, req resource.Cr
 
 func (r *BootSourceOverrideResource) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
 	tflog.Info(ctx, "boot_source_override: read starts")
-
-	// Read Terraform prior state data into the model
-	var currState /*, newState*/ models.BootSourceOverrideResourceModel
-	resp.Diagnostics.Append(req.State.Get(ctx, &currState)...)
-	if resp.Diagnostics.HasError() {
-		return
-	}
-
-	// Connect to service
-	api, err := ConnectTargetSystem(r.p, &currState.RedfishServer)
-	if err != nil {
-		resp.Diagnostics.AddError("service error: ", err.Error())
-		return
-	}
-
-	defer api.Logout()
-
-	//	diags = resp.State.Set(ctx, &newState)
-	//	resp.Diagnostics.Append(diags...)
-
 	tflog.Info(ctx, "boot_source_override: read ends")
 }
 
