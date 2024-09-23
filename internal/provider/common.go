@@ -23,6 +23,7 @@ const (
 	irmcRestart            string = "irmc_reset"
 	bootSourceOverrideName string = "boot_source_override"
 	bootOrderName          string = "boot_order"
+	biosName               string = "bios"
 )
 
 const (
