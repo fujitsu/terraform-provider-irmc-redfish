@@ -113,6 +113,7 @@ func (p *IrmcProvider) Resources(ctx context.Context) []func() resource.Resource
 		NewIrmcRestartResource,
 		NewBootSourceOverrideResource,
 		NewBootOrderResource,
+		NewBiosResource,
 	}
 }
 

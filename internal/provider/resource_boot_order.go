@@ -30,11 +30,6 @@ import (
 	"github.com/stmcginnis/gofish/redfish"
 )
 
-const (
-	PERSISTENT_BOOT_ORDER_KEY = "PersistentBootConfigOrder"
-	BIOS_SETTINGS_ENDPOINT    = "/redfish/v1/Systems/0/Bios/Settings"
-)
-
 // Ensure provider defined types fully satisfy framework interfaces.
 var _ resource.Resource = &BootOrderResource{}
 var _ resource.ResourceWithImportState = &BootOrderResource{}
@@ -175,7 +170,9 @@ func (r *BootOrderResource) Create(ctx context.Context, req resource.CreateReque
 		return
 	}
 
-	diags = waitTillBootOrderApplied(ctx, api.Service, plan)
+	diags = waitTillBiosSettingsApplied(ctx, api.Service, plan.JobTimeout.ValueInt64(),
+		redfish.ResetType(plan.SystemResetType.ValueString()))
+
 	resp.Diagnostics.Append(diags...)
 	if diags.HasError() {
 		return
@@ -354,7 +351,7 @@ func applyBootOrderPlan(service *gofish.Service, currentBootOrder []BootOrderEnt
 
 	payload := map[string]interface{}{
 		"Attributes": map[string]interface{}{
-			"PersistentBootConfigOrder": v,
+			PERSISTENT_BOOT_ORDER_KEY: v,
 		},
 	}
 
