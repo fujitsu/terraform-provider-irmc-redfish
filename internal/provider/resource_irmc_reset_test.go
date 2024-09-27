@@ -10,7 +10,7 @@ import (
 	"github.com/stmcginnis/gofish"
 )
 
-// Test to create irmc reset resource with invalid id
+// Test to create irmc reset resource with invalid id.
 func TestAccRedfishIRMCReset_Invalid_ResetType_Negative(t *testing.T) {
 	resource.Test(t, resource.TestCase{
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
@@ -46,7 +46,7 @@ func TestAccRedfishIRMCReset_HostOn(t *testing.T) {
 	})
 }
 
-// Test to perform irmc reset when host off
+// Test to perform irmc reset when host off.
 func TestAccRedfishIRMCReset_HostOff(t *testing.T) {
 	resource.Test(t, resource.TestCase{
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,

@@ -109,11 +109,6 @@ func (d *IrmcVirtualMediaDataSource) Read(ctx context.Context, req datasource.Re
 		return
 	}
 
-	if len(vmedia_collection) == 0 {
-		//        resp.Diagnostics.AddWarning("Virtual media collection is empty", "")
-		//        return
-	}
-
 	// Browse collection of vmedia and store its values
 	for _, vmedia := range vmedia_collection {
 		var found_vmedia models.VirtualMediaData

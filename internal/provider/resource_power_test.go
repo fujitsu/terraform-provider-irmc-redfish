@@ -11,7 +11,6 @@ import (
 
 const (
 	resource_irmc_host_power = "irmc-redfish_power.pwr"
-	timeout                  = 120
 	sleepDuration            = 5 * time.Minute
 )
 
@@ -38,12 +37,14 @@ func TestAccRedfishIrmcPower(t *testing.T) {
 			}
 
 			if isPoweredOn {
-				changePowerState(api.Service, false, 120)
+				if err = changePowerState(api.Service, false, 120); err != nil {
+					t.Fatalf("Failed to change power state within given timeout: %s", err.Error())
+				}
 			}
 		},
 		Steps: []resource.TestStep{
 			{
-				Config: testAccRedfishResourcePowerConfig(creds, "On", timeout),
+				Config: testAccRedfishResourcePowerConfig(creds, "On"),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr(resource_irmc_host_power, "power_state", "On"),
 				),
@@ -52,25 +53,25 @@ func TestAccRedfishIrmcPower(t *testing.T) {
 				PreConfig: func() {
 					time.Sleep(sleepDuration)
 				},
-				Config: testAccRedfishResourcePowerConfig(creds, "GracefulShutdown", timeout),
+				Config: testAccRedfishResourcePowerConfig(creds, "GracefulShutdown"),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr(resource_irmc_host_power, "power_state", "Off"),
 				),
 			},
 			{
-				Config: testAccRedfishResourcePowerConfig(creds, "ForceOn", timeout),
+				Config: testAccRedfishResourcePowerConfig(creds, "ForceOn"),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr(resource_irmc_host_power, "power_state", "On"),
 				),
 			},
 			{
-				Config: testAccRedfishResourcePowerConfig(creds, "ForceOff", timeout),
+				Config: testAccRedfishResourcePowerConfig(creds, "ForceOff"),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr(resource_irmc_host_power, "power_state", "Off"),
 				),
 			},
 			{
-				Config: testAccRedfishResourcePowerConfig(creds, "On", timeout),
+				Config: testAccRedfishResourcePowerConfig(creds, "On"),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr(resource_irmc_host_power, "power_state", "On"),
 				),
@@ -79,7 +80,7 @@ func TestAccRedfishIrmcPower(t *testing.T) {
 				PreConfig: func() {
 					time.Sleep(sleepDuration)
 				},
-				Config: testAccRedfishResourcePowerConfig(creds, "ForceRestart", timeout),
+				Config: testAccRedfishResourcePowerConfig(creds, "ForceRestart"),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr(resource_irmc_host_power, "power_state", "On"),
 				),
@@ -88,7 +89,7 @@ func TestAccRedfishIrmcPower(t *testing.T) {
 				PreConfig: func() {
 					time.Sleep(sleepDuration)
 				},
-				Config: testAccRedfishResourcePowerConfig(creds, "PowerCycle", timeout),
+				Config: testAccRedfishResourcePowerConfig(creds, "PowerCycle"),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr(resource_irmc_host_power, "power_state", "On"),
 				),
@@ -96,7 +97,7 @@ func TestAccRedfishIrmcPower(t *testing.T) {
 			{
 				// This test case might lead to problems when booted host OS does not have
 				// configured behavior for power button (e.g.: in Linux environment)
-				Config: testAccRedfishResourcePowerConfig(creds, "PushPowerButton", timeout),
+				Config: testAccRedfishResourcePowerConfig(creds, "PushPowerButton"),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr(resource_irmc_host_power, "power_state", "Off"),
 				),
@@ -107,7 +108,6 @@ func TestAccRedfishIrmcPower(t *testing.T) {
 
 func testAccRedfishResourcePowerConfig(testingInfo TestingServerCredentials,
 	HostPowerAction string,
-	MaxWaitTime int,
 ) string {
 	return fmt.Sprintf(`
 	resource "irmc-redfish_power" "pwr" {
@@ -119,13 +119,12 @@ func testAccRedfishResourcePowerConfig(testingInfo TestingServerCredentials,
 		  ssl_insecure = true
 		}
 		  host_power_action = "%s"
-		  max_wait_time = %d
+		  max_wait_time = 120
 	  }
 	`,
 		testingInfo.Username,
 		testingInfo.Password,
 		testingInfo.Endpoint,
 		HostPowerAction,
-		MaxWaitTime,
 	)
 }

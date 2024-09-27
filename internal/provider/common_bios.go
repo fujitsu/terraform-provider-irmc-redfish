@@ -24,8 +24,7 @@ func waitTillBiosSettingsApplied(ctx context.Context, service *gofish.Service, t
 		return diags
 	}
 
-	var logMsg string
-	logMsg = fmt.Sprintf("Process will wait with %d seconds timeout to finish", timeout)
+	var logMsg string = fmt.Sprintf("Process will wait with %d seconds timeout to finish", timeout)
 	tflog.Info(ctx, logMsg)
 
 	startTime := time.Now().Unix()

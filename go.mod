@@ -1,6 +1,6 @@
 module terraform-provider-irmc-redfish
 
-go 1.21
+go 1.22
 
 require (
 	github.com/hashicorp/terraform-plugin-docs v0.18.0
