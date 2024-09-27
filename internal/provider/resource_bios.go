@@ -353,7 +353,7 @@ func validateAndAdjustPlannedAttributes(ctx context.Context, service *gofish.Ser
 			return adjustedAttributes, diags
 		}
 
-		if isAttributeSupported(key) == false {
+		if !isAttributeSupported(key) {
 			var msg string = fmt.Sprintf("Attribute '%s' is not supported by the resource", key)
 			diags.AddError("Not supported attribute by the resource", msg)
 			return adjustedAttributes, diags
@@ -393,7 +393,7 @@ func validateAndAdjustPlannedAttributes(ctx context.Context, service *gofish.Ser
 	return adjustedAttributes, diags
 }
 
-// convertRedfishBiosAttributesToUnifiedFormat converts attributes to common map[string]string format
+// convertRedfishBiosAttributesToUnifiedFormat converts attributes to common map[string]string format.
 func convertRedfishBiosAttributesToUnifiedFormat(input redfish.SettingsAttributes) map[string]string {
 	attributes := make(map[string]string)
 	for key, val := range input {
@@ -407,7 +407,7 @@ func convertRedfishBiosAttributesToUnifiedFormat(input redfish.SettingsAttribute
 	return attributes
 }
 
-// isAttributeSupported returns information whether attribute is or is not supported by this endpoint
+// isAttributeSupported returns information whether attribute is or is not supported by this endpoint.
 func isAttributeSupported(key string) bool {
 	// Some parameters due to their complex JSON structure are not supported by this implementation
 	if key == "BootSources" || key == PERSISTENT_BOOT_ORDER_KEY {
@@ -417,7 +417,7 @@ func isAttributeSupported(key string) bool {
 	return true
 }
 
-// readBiosAttributesSettingsToModel reads target bios settings from service into state attributes
+// readBiosAttributesSettingsToModel reads target bios settings from service into state attributes.
 func readBiosAttributesSettingsToModel(ctx context.Context, service *gofish.Service, state *models.BiosResourceModel) (diags diag.Diagnostics) {
 	system, err := GetSystemResource(service)
 	if err != nil {
@@ -445,7 +445,7 @@ func readBiosAttributesSettingsToModel(ctx context.Context, service *gofish.Serv
 	attributes := convertRedfishBiosAttributesToUnifiedFormat(rBios.Attributes)
 	configuredAttributes := state.Attributes.Elements()
 	for key, val := range attributes {
-		if isAttributeSupported(key) == true {
+		if isAttributeSupported(key) {
 			if _, ok := configuredAttributes[key]; ok {
 				// only these attributes are put into the state, which were previously configured by user
 				attributesIntoModel[key] = types.StringValue(val)

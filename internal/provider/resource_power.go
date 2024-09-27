@@ -171,7 +171,7 @@ func (r *PowerResource) Create(ctx context.Context, req resource.CreateRequest, 
 			return
 		}
 
-		_, powerErr = waitUntilHostStateChanged(config.Service, false, powerPlan.MaxWaitTime.ValueInt64())
+		powerErr = waitUntilHostStateChanged(config.Service, false, powerPlan.MaxWaitTime.ValueInt64())
 		if powerErr != nil {
 			resp.Diagnostics.AddError("Host state has not been changed within given timeout", powerErr.Error())
 			return

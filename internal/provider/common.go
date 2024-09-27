@@ -43,7 +43,7 @@ type CommonImportConfig struct {
 	ID string `json:"id"`
 }
 
-// RedfishServerDatasourceSchema to construct schema of redfish server
+// RedfishServerDatasourceSchema to construct schema of redfish server.
 func RedfishServerDatasourceSchema() map[string]datasourceSchema.Attribute {
 	return map[string]datasourceSchema.Attribute{
 		"username": datasourceSchema.StringAttribute{
@@ -88,7 +88,7 @@ func RedfishServerSchema() map[string]resourceSchema.Attribute {
 	}
 }
 
-// RedfishServerDatasourceBlockMap to construct common lock map for data sources
+// RedfishServerDatasourceBlockMap to construct common lock map for data sources.
 func RedfishServerDatasourceBlockMap() map[string]datasourceSchema.Block {
 	return map[string]datasourceSchema.Block{
 		"server": datasourceSchema.ListNestedBlock{
@@ -168,7 +168,7 @@ func ConnectTargetSystem(pconfig *IrmcProvider, rserver *[]models.RedfishServer)
 	return api, nil
 }
 
-// GetSystemResource returns ComputerSystem resource from target defined by service
+// GetSystemResource returns ComputerSystem resource from target defined by service.
 func GetSystemResource(service *gofish.Service) (*redfish.ComputerSystem, error) {
 	systems, err := service.Systems()
 	if err != nil {

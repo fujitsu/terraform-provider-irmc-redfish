@@ -162,7 +162,7 @@ func GetVirtualMedia(vmediaID string, vms []*redfish.VirtualMedia) (*redfish.Vir
 }
 
 // WaitForMediaSuccessfullyMounted checks requested endpoint of given service
-// until the endpoint will returned Inserted as true or counter will reach limit
+// until the endpoint will returned Inserted as true or counter will reach limit.
 func WaitForMediaSuccessfullyMounted(service *gofish.Service, endpoint string) (*redfish.VirtualMedia, error) {
 	cnt := 20 // number of tries every second
 	virtualMedia, err := redfish.GetVirtualMedia(service.GetClient(), endpoint)
@@ -171,7 +171,7 @@ func WaitForMediaSuccessfullyMounted(service *gofish.Service, endpoint string) (
 			return nil, fmt.Errorf("%d Could not read media state %s due to %w", cnt, endpoint, err)
 		}
 
-		if virtualMedia.Inserted == true {
+		if virtualMedia.Inserted {
 			break
 		}
 
@@ -345,18 +345,13 @@ func (r *VirtualMediaResource) Update(ctx context.Context, req resource.UpdateRe
 	// Validate required image and define under which index it could be tried to be mounted
 	image := plan.Image.ValueString()
 	var imageType VmediaImageType = IMAGE_TYPE_UNKNOWN
-	redfish_index := 0
 	if strings.HasSuffix(image, ".iso") {
 		imageType = IMAGE_TYPE_ISO
-		redfish_index = 0
 	} else {
 		if strings.HasSuffix(image, ".img") {
 			imageType = IMAGE_TYPE_IMG
-			redfish_index = 1
 		}
 	}
-
-	redfish_index = redfish_index + 1
 
 	if imageType == IMAGE_TYPE_UNKNOWN {
 		resp.Diagnostics.AddError("Image type format is not supported", "Only .iso and .img formats are supported")

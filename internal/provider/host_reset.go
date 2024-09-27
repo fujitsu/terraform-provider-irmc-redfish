@@ -15,7 +15,7 @@ const (
 	BIOS_ENDPOINT = "/redfish/v1/Systems/0/Bios"
 )
 
-// isPoweredOn returns information whether host defined by service is powered on or not
+// isPoweredOn returns information whether host defined by service is powered on or not.
 func isPoweredOn(service *gofish.Service) (bool, error) {
 	system, err := GetSystemResource(service)
 	if err != nil {
@@ -30,27 +30,27 @@ func isPoweredOn(service *gofish.Service) (bool, error) {
 }
 
 // waitUntilHostStateChanged waits with timeout until expectedPoweredOn will be reached
-// by target defined as service
-func waitUntilHostStateChanged(service *gofish.Service, expectedPoweredOn bool, timeout int64) (bool, error) {
+// by target defined as service.
+func waitUntilHostStateChanged(service *gofish.Service, expectedPoweredOn bool, timeout int64) error {
 	startTime := time.Now().Unix()
 	for {
 		poweredOn, err := isPoweredOn(service)
 		if err != nil {
-			return false, err
+			return err
 		}
 
 		if expectedPoweredOn {
 			if poweredOn {
-				return true, nil
+				return nil
 			}
 		} else {
 			if !poweredOn {
-				return true, nil
+				return nil
 			}
 		}
 
 		if time.Now().Unix()-startTime > timeout {
-			return false, fmt.Errorf("error. Host state has not been changed within given timeout %d", timeout)
+			return fmt.Errorf("error. Host state has not been changed within given timeout %d", timeout)
 		}
 
 		time.Sleep(2 * time.Second)
@@ -70,7 +70,7 @@ type biosObject struct {
 }
 
 // isBiosInPOSTPhase returns information whether host reports
-// being in POST state or not
+// being in POST state or not.
 func isBiosInPOSTPhase(service *gofish.Service) (bool, error) {
 	res, err := service.GetClient().Get(BIOS_ENDPOINT)
 	if err != nil {
@@ -97,9 +97,9 @@ func isBiosInPOSTPhase(service *gofish.Service) (bool, error) {
 
 // waitUntilHostStateChangedEnhanced waits until host will change its state
 // based on BIOS POST phase (exit of the POST phase together with host powered on state
-// is treated as reached powered on state)
-func waitUntilHostStateChangedEnhanced(service *gofish.Service, expectedPoweredOn bool, timeout int64) (bool, error) {
-	if expectedPoweredOn == false {
+// is treated as reached powered on state).
+func waitUntilHostStateChangedEnhanced(service *gofish.Service, expectedPoweredOn bool, timeout int64) error {
+	if !expectedPoweredOn {
 		return waitUntilHostStateChanged(service, expectedPoweredOn, timeout)
 	}
 
@@ -109,16 +109,16 @@ func waitUntilHostStateChangedEnhanced(service *gofish.Service, expectedPoweredO
 		for {
 			biosDuringPOST, err := isBiosInPOSTPhase(service)
 			if err != nil {
-				return false, err
+				return err
 			}
 
-			if biosDuringPOST == true {
+			if biosDuringPOST {
 				break
 			} else {
 				time.Sleep(time.Second)
 
 				if time.Now().Unix()-startTime > timeout {
-					return false, fmt.Errorf("BIOS did not entered POST within given timeout %d", timeout)
+					return fmt.Errorf("BIOS did not entered POST within given timeout %d", timeout)
 				}
 			}
 		}
@@ -127,33 +127,33 @@ func waitUntilHostStateChangedEnhanced(service *gofish.Service, expectedPoweredO
 		for {
 			biosDuringPOST, err := isBiosInPOSTPhase(service)
 			if err != nil {
-				return false, err
+				return err
 			}
 
-			if biosDuringPOST == false {
+			if !biosDuringPOST {
 				isPoweredOn, err := isPoweredOn(service)
 				if err != nil {
-					return false, nil
+					return err
 				}
 
-				if isPoweredOn == true {
-					return true, nil
+				if isPoweredOn {
+					return nil
 				} else {
-					return false, fmt.Errorf("BIOS exited POST but host powered off")
+					return fmt.Errorf("BIOS exited POST but host powered off")
 				}
 			} else {
 				time.Sleep(2 * time.Second)
 			}
 
 			if time.Now().Unix()-startTime > timeout {
-				return false, fmt.Errorf("Operation not finished within given timeout %d", timeout)
+				return fmt.Errorf("Operation not finished within given timeout %d", timeout)
 			}
 		}
 	}
 }
 
 // changePowerState tries to change host state to value defined in powerOn with timeout
-// when requested power state should be reached
+// when requested power state should be reached.
 func changePowerState(service *gofish.Service, powerOn bool, timeout int64) error {
 	system, err := GetSystemResource(service)
 	if err != nil {
@@ -167,7 +167,7 @@ func changePowerState(service *gofish.Service, powerOn bool, timeout int64) erro
 
 	operation := redfish.OnResetType
 	expectedTargetState := true
-	if powerOn == true {
+	if powerOn {
 		if isPoweredOn {
 			return nil
 		}
@@ -185,7 +185,7 @@ func changePowerState(service *gofish.Service, powerOn bool, timeout int64) erro
 		return err
 	}
 
-	_, err = waitUntilHostStateChangedEnhanced(service, expectedTargetState, timeout)
+	err = waitUntilHostStateChangedEnhanced(service, expectedTargetState, timeout)
 	if err != nil {
 		return err
 	}
@@ -193,7 +193,7 @@ func changePowerState(service *gofish.Service, powerOn bool, timeout int64) erro
 	return nil
 }
 
-// resetHost calls host reset using resetType defined by caller
+// resetHost calls host reset using resetType defined by caller.
 func resetHost(service *gofish.Service, resetType redfish.ResetType, timeout int64) error {
 	system, err := GetSystemResource(service)
 	if err != nil {
@@ -211,7 +211,7 @@ func resetHost(service *gofish.Service, resetType redfish.ResetType, timeout int
 		expectedTargetState = false
 	}
 
-	_, err = waitUntilHostStateChangedEnhanced(service, expectedTargetState, timeout)
+	err = waitUntilHostStateChangedEnhanced(service, expectedTargetState, timeout)
 	if err != nil {
 		return err
 	}
@@ -220,20 +220,20 @@ func resetHost(service *gofish.Service, resetType redfish.ResetType, timeout int
 }
 
 // resetOrPowerOnHostWithPostCheck powers on host if it's currently powered off
-// or performs requested resetType operation if host is on within given timeout
+// or performs requested resetType operation if host is on within given timeout.
 func resetOrPowerOnHostWithPostCheck(service *gofish.Service, resetType redfish.ResetType, timeout int64) error {
 	poweredOn, err := isPoweredOn(service)
 	if err != nil {
-		return nil
+		return err
 	}
 
-	if poweredOn == false {
+	if !poweredOn {
 		if err = changePowerState(service, true, timeout); err != nil {
-			return nil
+			return err
 		}
 	} else {
 		if err = resetHost(service, resetType, timeout); err != nil {
-			return nil
+			return err
 		}
 	}
 

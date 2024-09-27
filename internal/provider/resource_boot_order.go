@@ -369,7 +369,7 @@ func applyBootOrderPlan(service *gofish.Service, currentBootOrder []BootOrderEnt
 
 // getBiosSettingsFutureAttributesNumber reads property Attributes from /Bios/Settings
 // and returns number of elements inside of the property or error information during processing
-// over diags
+// over diags.
 func getBiosSettingsFutureAttributesNumber(service *gofish.Service) (length int, diags diag.Diagnostics) {
 	client := service.GetClient()
 	res, err := client.Get(BIOS_SETTINGS_ENDPOINT)
@@ -397,7 +397,7 @@ func getBiosSettingsFutureAttributesNumber(service *gofish.Service) (length int,
 }
 
 // waitTillBootOrderApplied supervises applying boot order from plan
-// and return possible errors during processing using diags
+// and return possible errors during processing using diags.
 func waitTillBootOrderApplied(ctx context.Context, service *gofish.Service, plan models.BootOrderResourceModel) (diags diag.Diagnostics) {
 	poweredOn, err := isPoweredOn(service)
 	if err != nil {
@@ -406,8 +406,7 @@ func waitTillBootOrderApplied(ctx context.Context, service *gofish.Service, plan
 	}
 
 	timeout := plan.JobTimeout.ValueInt64()
-	var logMsg string
-	logMsg = fmt.Sprintf("Process will wait with %d seconds timeout to finish", timeout)
+	var logMsg string = fmt.Sprintf("Process will wait with %d seconds timeout to finish", timeout)
 	tflog.Info(ctx, logMsg)
 
 	startTime := time.Now().Unix()
@@ -470,8 +469,13 @@ func (be *BootEntry) UnmarshalJSON(data []byte) error {
 		return err
 	}
 
-	be.StructuredBootString = v[0].(string)
-	be.DeviceName = v[1].(string)
+	if val, ok := v[0].(string); ok {
+		be.StructuredBootString = val
+	}
+
+	if val, ok := v[1].(string); ok {
+		be.DeviceName = val
+	}
 
 	return nil
 }
@@ -483,20 +487,6 @@ func isBootEntryInBootOrder(value string, bootOrder []BootOrderEntry) bool {
 		}
 	}
 	return false
-}
-
-func difference(a, b []string) []string {
-	mb := make(map[string]struct{}, len(b))
-	for _, x := range b {
-		mb[x] = struct{}{}
-	}
-	var diff []string
-	for _, x := range a {
-		if _, found := mb[x]; !found {
-			diff = append(diff, x)
-		}
-	}
-	return diff
 }
 
 func findAvailableAndNotPlannedBootEntries(currentBootOrder []BootOrderEntry, plannedBootOrder BootOrder) []string {
@@ -551,7 +541,7 @@ func validateBootOrderPlan(service *gofish.Service, plannedBootOrder BootOrder) 
 
 		// If any planned option does not exist on currently configured boot order, raise error
 		for _, v := range plannedBootOrder {
-			if isBootEntryInBootOrder(v, currentBootOrder) == false {
+			if !isBootEntryInBootOrder(v, currentBootOrder) {
 				var msg string = fmt.Sprintf("Entry '%s' is not on the list of supported boot entries for the system '%s'", v, currentBootOrder)
 				diags.AddError("Planned changes for boot order did not pass validation", msg)
 			}
@@ -563,9 +553,9 @@ func validateBootOrderPlan(service *gofish.Service, plannedBootOrder BootOrder) 
 
 		// If planned configuration does not contain all options for the system, stop
 		if len(plannedBootOrder) != len(currentBootOrder) {
-			var details string = fmt.Sprintf("Planned boot order has length of %d, while current lenght of %d",
+			var details string = fmt.Sprintf("Planned boot order has length of %d, while current length of %d",
 				len(plannedBootOrder), len(currentBootOrder))
-			diags.AddError("Planned boot order has different lenght than currently configured boot order", details)
+			diags.AddError("Planned boot order has different length than currently configured boot order", details)
 			return currentBootOrder, diags
 		}
 
@@ -583,7 +573,7 @@ func validateBootOrderPlan(service *gofish.Service, plannedBootOrder BootOrder) 
 	}
 }
 
-// readCurrentBootOrder reads currently configured boot order and save it to state
+// readCurrentBootOrder reads currently configured boot order and save it to state.
 func readCurrentBootOrder(service *gofish.Service, state *models.BootOrderResourceModel) (diags diag.Diagnostics) {
 	system, err := GetSystemResource(service)
 	if err != nil {

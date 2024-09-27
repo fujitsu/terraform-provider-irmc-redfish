@@ -15,19 +15,19 @@ const (
 	resource_name        = "irmc-redfish_virtual_media.vm"
 )
 
-func getVMediaImportConfiguration(d *terraform.State, creds TestingServerCredentials) (string, error) {
+func getVMediaImportConfiguration(creds TestingServerCredentials) (string, error) {
 	id := "/redfish/v1/Managers/iRMC/VirtualMedia/0"
 	return fmt.Sprintf("{\"id\":\"%s\", \"username\":\"%s\", \"password\":\"%s\", \"endpoint\":\"https://%s\", \"ssl_insecure\":true}",
 		id, creds.Username, creds.Password, creds.Endpoint), nil
 }
 
-func getVMediaImportHdConfiguration(d *terraform.State, creds TestingServerCredentials) (string, error) {
+func getVMediaImportHdConfiguration(creds TestingServerCredentials) (string, error) {
 	id := "/redfish/v1/Managers/iRMC/VirtualMedia/1"
 	return fmt.Sprintf("{\"id\":\"%s\", \"username\":\"%s\", \"password\":\"%s\", \"endpoint\":\"https://%s\", \"ssl_insecure\":true}",
 		id, creds.Username, creds.Password, creds.Endpoint), nil
 }
 
-func getVMediaImportConfigurationInvalidId(d *terraform.State, creds TestingServerCredentials) (string, error) {
+func getVMediaImportConfigurationInvalidId(creds TestingServerCredentials) (string, error) {
 	return fmt.Sprintf("{\"id\":\"unknown\", \"username\":\"%s\", \"password\":\"%s\", \"endpoint\":\"https://%s\", \"ssl_insecure\":true}",
 		creds.Username, creds.Password, creds.Endpoint), nil
 }
@@ -60,7 +60,7 @@ func TestAccRedfishVirtualMedia_basic_cd(t *testing.T) {
 				ImportState:       true,
 				ImportStateVerify: true,
 				ImportStateIdFunc: func(d *terraform.State) (string, error) {
-					return getVMediaImportConfiguration(d, creds)
+					return getVMediaImportConfiguration(creds)
 				},
 			},
 			{
@@ -68,7 +68,7 @@ func TestAccRedfishVirtualMedia_basic_cd(t *testing.T) {
 				ImportState:  true,
 				//                ImportStateVerify: true,
 				ImportStateIdFunc: func(d *terraform.State) (string, error) {
-					return getVMediaImportConfigurationInvalidId(d, creds)
+					return getVMediaImportConfigurationInvalidId(creds)
 				},
 				ExpectError: regexp.MustCompile("Virtual media with ID unknown does not exist."),
 			},
@@ -95,7 +95,7 @@ func TestAccRedfishVirtualMedia_basic_hd(t *testing.T) {
 				ImportState:       true,
 				ImportStateVerify: true,
 				ImportStateIdFunc: func(d *terraform.State) (string, error) {
-					return getVMediaImportHdConfiguration(d, creds)
+					return getVMediaImportHdConfiguration(creds)
 				},
 			},
 		},
