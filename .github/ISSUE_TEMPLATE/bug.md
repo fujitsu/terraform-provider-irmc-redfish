@@ -27,6 +27,10 @@ name: Bug report
 # Terraform configuration files can be pasted here as text
 ```
 
+## Logs from provider execution
+
+<!--- Please paste logs from provider execution proceeded by enabling TF_LOG=INFO --->
+
 ## Actual behavior
 
 <!--- Please put description about behavior you observe --->
