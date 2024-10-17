@@ -130,6 +130,12 @@ func (r *PowerResource) Create(ctx context.Context, req resource.CreateRequest, 
 		return
 	}
 
+	// Provide synchronization
+	var endpoint string = powerPlan.RedfishServer[0].Endpoint.ValueString()
+	var resource_name string = "resource-power"
+	mutexPool.Lock(ctx, endpoint, resource_name)
+	defer mutexPool.Unlock(ctx, endpoint, resource_name)
+
 	// Initialize the Redfish server connection
 	config, err := ConnectTargetSystem(r.p, &powerPlan.RedfishServer)
 	if err != nil {

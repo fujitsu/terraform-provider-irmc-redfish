@@ -216,7 +216,7 @@ const (
 )
 
 func (r *VirtualMediaResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
-	tflog.Info(ctx, "virtual-media: create starts")
+	tflog.Info(ctx, "resource-virtual_media: create starts")
 
 	// Read Terraform plan data into the model
 	var plan models.VirtualMediaResourceModel
@@ -225,6 +225,12 @@ func (r *VirtualMediaResource) Create(ctx context.Context, req resource.CreateRe
 	if resp.Diagnostics.HasError() {
 		return
 	}
+
+	// Provide synchronization
+	var endpoint string = plan.RedfishServer[0].Endpoint.ValueString()
+	var resource_name string = "resource-virtual_media"
+	mutexPool.Lock(ctx, endpoint, resource_name)
+	defer mutexPool.Unlock(ctx, endpoint, resource_name)
 
 	// Validate required image and define under which index it could be tried to be mounted
 	image := plan.Image.ValueString()
@@ -278,7 +284,7 @@ func (r *VirtualMediaResource) Create(ctx context.Context, req resource.CreateRe
 				result := r.updateVirtualMediaState(vmedia, plan)
 				diags = resp.State.Set(ctx, &result)
 				resp.Diagnostics.Append(diags...)
-				tflog.Info(ctx, "virtual-media: create ends")
+				tflog.Info(ctx, "resource-virtual_media: create ends")
 				return
 			}
 		}
@@ -289,7 +295,7 @@ func (r *VirtualMediaResource) Create(ctx context.Context, req resource.CreateRe
 }
 
 func (r *VirtualMediaResource) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
-	tflog.Info(ctx, "virtual-media: read starts")
+	tflog.Info(ctx, "resource-virtual_media: read starts")
 
 	// Read Terraform prior state data into the model
 	var state models.VirtualMediaResourceModel
@@ -321,11 +327,11 @@ func (r *VirtualMediaResource) Read(ctx context.Context, req resource.ReadReques
 	// Save updated data into Terraform state
 	new_state := r.updateVirtualMediaState(virtualMedia, state)
 	resp.Diagnostics.Append(resp.State.Set(ctx, &new_state)...)
-	tflog.Info(ctx, "virtual-media: read ends")
+	tflog.Info(ctx, "resource-virtual_media: read ends")
 }
 
 func (r *VirtualMediaResource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
-	tflog.Info(ctx, "virtual-media: update starts")
+	tflog.Info(ctx, "resource-virtual_media: update starts")
 
 	// Read Terraform plan
 	var plan models.VirtualMediaResourceModel
@@ -406,11 +412,11 @@ func (r *VirtualMediaResource) Update(ctx context.Context, req resource.UpdateRe
 	result := r.updateVirtualMediaState(vmedia, state)
 	diags = resp.State.Set(ctx, &result)
 	resp.Diagnostics.Append(diags...)
-	tflog.Info(ctx, "virtual-media: update ends")
+	tflog.Info(ctx, "resource-virtual_media: update ends")
 }
 
 func (r *VirtualMediaResource) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {
-	tflog.Info(ctx, "virtual-media: delete starts")
+	tflog.Info(ctx, "resource-virtual_media: delete starts")
 
 	// Read Terraform prior state data into the model
 	var state models.VirtualMediaResourceModel
@@ -445,11 +451,11 @@ func (r *VirtualMediaResource) Delete(ctx context.Context, req resource.DeleteRe
 	result := r.updateVirtualMediaState(vmedia, state)
 	diags = resp.State.Set(ctx, &result)
 	resp.Diagnostics.Append(diags...)
-	tflog.Info(ctx, "virtual_media: delete ends")
+	tflog.Info(ctx, "resource-virtual_media: delete ends")
 }
 
 func (r *VirtualMediaResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
-	tflog.Info(ctx, "virtual_media: import starts")
+	tflog.Info(ctx, "resource-virtual_media: import starts")
 
 	var config CommonImportConfig
 	err := json.Unmarshal([]byte(req.ID), &config)
@@ -497,5 +503,5 @@ func (r *VirtualMediaResource) ImportState(ctx context.Context, req resource.Imp
 	diags := resp.State.Set(ctx, &result)
 	resp.Diagnostics.Append(diags...)
 
-	tflog.Info(ctx, "virtual_media: import ends")
+	tflog.Info(ctx, "resource-virtual_media: import ends")
 }

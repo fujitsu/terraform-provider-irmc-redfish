@@ -87,6 +87,11 @@ func (r *IrmcRestartResource) Create(ctx context.Context, req resource.CreateReq
 		return
 	}
 
+	var endpoint string = plan.RedfishServer[0].Endpoint.ValueString()
+	var resource_name string = "resource-irmc-reset"
+	mutexPool.Lock(ctx, endpoint, resource_name)
+	defer mutexPool.Unlock(ctx, endpoint, resource_name)
+
 	config, err := ConnectTargetSystem(r.p, &plan.RedfishServer)
 	if err != nil {
 		resp.Diagnostics.AddError("Service Connect Target System Error", err.Error())

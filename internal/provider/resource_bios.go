@@ -116,7 +116,7 @@ func (r *BiosResource) Configure(ctx context.Context, req resource.ConfigureRequ
 }
 
 func (r *BiosResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
-	tflog.Info(ctx, "bios: create starts")
+	tflog.Info(ctx, "resource-bios: create starts")
 
 	// Read Terraform plan data into the model
 	var plan models.BiosResourceModel
@@ -125,6 +125,12 @@ func (r *BiosResource) Create(ctx context.Context, req resource.CreateRequest, r
 	if resp.Diagnostics.HasError() {
 		return
 	}
+
+	// Provide synchronization
+	var endpoint string = plan.RedfishServer[0].Endpoint.ValueString()
+	var resource_name string = "resource-bios"
+	mutexPool.Lock(ctx, endpoint, resource_name)
+	defer mutexPool.Unlock(ctx, endpoint, resource_name)
 
 	// Connect to service
 	api, err := ConnectTargetSystem(r.p, &plan.RedfishServer)
@@ -170,11 +176,11 @@ func (r *BiosResource) Create(ctx context.Context, req resource.CreateRequest, r
 		return
 	}
 
-	tflog.Info(ctx, "bios: create ends")
+	tflog.Info(ctx, "resource-bios: create ends")
 }
 
 func (r *BiosResource) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
-	tflog.Info(ctx, "bios: read starts")
+	tflog.Info(ctx, "resource-bios: read starts")
 
 	// Read Terraform prior state data into the model
 	var state models.BiosResourceModel
@@ -200,11 +206,11 @@ func (r *BiosResource) Read(ctx context.Context, req resource.ReadRequest, resp 
 	diags = resp.State.Set(ctx, &state)
 	resp.Diagnostics.Append(diags...)
 
-	tflog.Info(ctx, "bios: read ends")
+	tflog.Info(ctx, "resource-bios: read ends")
 }
 
 func (r *BiosResource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
-	tflog.Info(ctx, "bios: update starts")
+	tflog.Info(ctx, "resource-bios: update starts")
 
 	// Read Terraform plan
 	var plan models.BiosResourceModel
@@ -258,17 +264,17 @@ func (r *BiosResource) Update(ctx context.Context, req resource.UpdateRequest, r
 		return
 	}
 
-	tflog.Info(ctx, "bios: update ends")
+	tflog.Info(ctx, "resource-bios: update ends")
 }
 
 func (r *BiosResource) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {
-	tflog.Info(ctx, "bios: delete starts")
+	tflog.Info(ctx, "resource-bios: delete starts")
 	resp.State.RemoveResource(ctx)
-	tflog.Info(ctx, "bios: delete ends")
+	tflog.Info(ctx, "resource-bios: delete ends")
 }
 
 func (r *BiosResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
-	tflog.Info(ctx, "bios: import starts")
+	tflog.Info(ctx, "resource-bios: import starts")
 
 	var config CommonImportConfig
 	err := json.Unmarshal([]byte(req.ID), &config)
@@ -288,7 +294,7 @@ func (r *BiosResource) ImportState(ctx context.Context, req resource.ImportState
 
 	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, tkpath.Root("server"), creds)...)
 
-	tflog.Info(ctx, "bios: import ends")
+	tflog.Info(ctx, "resource-bios: import ends")
 }
 
 func applyBiosAttributes(service *gofish.Service, adjustedAttributes map[string]interface{}) (diags diag.Diagnostics) {
