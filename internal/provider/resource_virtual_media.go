@@ -79,7 +79,7 @@ func VirtualMediaSchema() map[string]schema.Attribute {
 			MarkdownDescription: "Indicates protocol on which the transfer will be done.",
 			Description:         "Indicates protocol on which the transfer will be done.",
 			Validators: []validator.String{
-				stringvalidator.OneOf([]string{"CIFS", "HTTP", "HTTPS", "NFS"}...),
+				stringvalidator.OneOf([]string{"CIFS", "HTTPS", "NFS"}...),
 			},
 		},
 	}

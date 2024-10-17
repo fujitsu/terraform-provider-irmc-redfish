@@ -69,11 +69,11 @@ func RedfishServerDatasourceSchema() map[string]datasourceSchema.Attribute {
 func RedfishServerSchema() map[string]resourceSchema.Attribute {
 	return map[string]resourceSchema.Attribute{
 		"username": resourceSchema.StringAttribute{
-			Required:    true,
+			Optional:    true,
 			Description: "User name for login",
 		},
 		"password": resourceSchema.StringAttribute{
-			Required:    true,
+			Optional:    true,
 			Description: "User password for login",
 			Sensitive:   true,
 		},
