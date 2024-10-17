@@ -128,7 +128,7 @@ func (r *BootOrderResource) Configure(ctx context.Context, req resource.Configur
 }
 
 func (r *BootOrderResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
-	tflog.Info(ctx, "boot_order: create starts")
+	tflog.Info(ctx, "resource-boot_order: create starts")
 
 	// Read Terraform plan data into the model
 	var plan models.BootOrderResourceModel
@@ -137,6 +137,12 @@ func (r *BootOrderResource) Create(ctx context.Context, req resource.CreateReque
 	if resp.Diagnostics.HasError() {
 		return
 	}
+
+	// Provide synchronization
+	var endpoint string = plan.RedfishServer[0].Endpoint.ValueString()
+	var resource_name string = "resource-boot_order"
+	mutexPool.Lock(ctx, endpoint, resource_name)
+	defer mutexPool.Unlock(ctx, endpoint, resource_name)
 
 	// Connect to service
 	api, err := ConnectTargetSystem(r.p, &plan.RedfishServer)
@@ -186,11 +192,11 @@ func (r *BootOrderResource) Create(ctx context.Context, req resource.CreateReque
 		return
 	}
 
-	tflog.Info(ctx, "boot_order: create ends")
+	tflog.Info(ctx, "resource-boot_order: create ends")
 }
 
 func (r *BootOrderResource) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
-	tflog.Info(ctx, "boot_order: read starts")
+	tflog.Info(ctx, "resource-boot_order: read starts")
 
 	// Read Terraform prior state data into the model
 	var currState, newState models.BootOrderResourceModel
@@ -221,11 +227,11 @@ func (r *BootOrderResource) Read(ctx context.Context, req resource.ReadRequest, 
 	diags = resp.State.Set(ctx, &newState)
 	resp.Diagnostics.Append(diags...)
 
-	tflog.Info(ctx, "boot_order: read ends")
+	tflog.Info(ctx, "resource-boot_order: read ends")
 }
 
 func (r *BootOrderResource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
-	tflog.Info(ctx, "boot_order: update starts")
+	tflog.Info(ctx, "resource-boot_order: update starts")
 
 	// Read Terraform plan
 	var plan models.BootOrderResourceModel
@@ -281,17 +287,17 @@ func (r *BootOrderResource) Update(ctx context.Context, req resource.UpdateReque
 		return
 	}
 
-	tflog.Info(ctx, "boot_order: update ends")
+	tflog.Info(ctx, "resource-boot_order: update ends")
 }
 
 func (r *BootOrderResource) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {
-	tflog.Info(ctx, "boot_order: delete starts")
+	tflog.Info(ctx, "resource-boot_order: delete starts")
 	resp.State.RemoveResource(ctx)
-	tflog.Info(ctx, "boot_order: delete ends")
+	tflog.Info(ctx, "resource-boot_order: delete ends")
 }
 
 func (r *BootOrderResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
-	tflog.Info(ctx, "boot_order: import starts")
+	tflog.Info(ctx, "resource-boot_order: import starts")
 
 	var config CommonImportConfig
 	err := json.Unmarshal([]byte(req.ID), &config)
@@ -311,7 +317,7 @@ func (r *BootOrderResource) ImportState(ctx context.Context, req resource.Import
 
 	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, tkpath.Root("server"), creds)...)
 
-	tflog.Info(ctx, "boot_order: import ends")
+	tflog.Info(ctx, "resource-boot_order: import ends")
 }
 
 func getDeviceNameFromStructureBootString(currentBootOrder []BootOrderEntry, structuredBootString string) string {

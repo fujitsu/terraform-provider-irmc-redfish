@@ -187,7 +187,7 @@ func bootSourceOverrideApply(api *gofish.APIClient, plan *models.BootSourceOverr
 }
 
 func (r *BootSourceOverrideResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
-	tflog.Info(ctx, "boot_source_override: create starts")
+	tflog.Info(ctx, "resource-boot_source_override: create starts")
 
 	// Read Terraform plan data into the model
 	var plan models.BootSourceOverrideResourceModel
@@ -196,6 +196,12 @@ func (r *BootSourceOverrideResource) Create(ctx context.Context, req resource.Cr
 	if resp.Diagnostics.HasError() {
 		return
 	}
+
+	// Provide synchronization
+	var endpoint string = plan.RedfishServer[0].Endpoint.ValueString()
+	var resource_name string = "resource-boot_source_override"
+	mutexPool.Lock(ctx, endpoint, resource_name)
+	defer mutexPool.Unlock(ctx, endpoint, resource_name)
 
 	// Connect to service
 	api, err := ConnectTargetSystem(r.p, &plan.RedfishServer)
@@ -228,21 +234,21 @@ func (r *BootSourceOverrideResource) Create(ctx context.Context, req resource.Cr
 		return
 	}
 
-	tflog.Info(ctx, "boot_source_override: create ends")
+	tflog.Info(ctx, "resource-boot_source_override: create ends")
 }
 
 func (r *BootSourceOverrideResource) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
-	tflog.Info(ctx, "boot_source_override: read starts")
-	tflog.Info(ctx, "boot_source_override: read ends")
+	tflog.Info(ctx, "resource-boot_source_override: read starts")
+	tflog.Info(ctx, "resource-boot_source_override: read ends")
 }
 
 func (r *BootSourceOverrideResource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
-	tflog.Info(ctx, "boot_source_override: update starts")
-	tflog.Info(ctx, "boot_source_override: update ends")
+	tflog.Info(ctx, "resource-boot_source_override: update starts")
+	tflog.Info(ctx, "resource-boot_source_override: update ends")
 }
 
 func (r *BootSourceOverrideResource) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {
-	tflog.Info(ctx, "boot_source_override: delete starts")
+	tflog.Info(ctx, "resource-boot_source_override: delete starts")
 	resp.State.RemoveResource(ctx)
-	tflog.Info(ctx, "boot_source_override: delete ends")
+	tflog.Info(ctx, "resource-boot_source_override: delete ends")
 }

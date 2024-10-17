@@ -17,6 +17,8 @@ import (
 // Ensure IrmcProvider satisfies various provider interfaces.
 var _ provider.Provider = &IrmcProvider{}
 
+var mutexPool = InitSyncPoolInstance()
+
 // IrmcProvider defines the provider implementation.
 type IrmcProvider struct {
 	// version is set to the provider version on release, "dev" when the
