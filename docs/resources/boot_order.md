@@ -1,6 +1,8 @@
 # irmc-redfish_boot_order (Resource)
 
 The resource is used to control (Create, Read, Delete, Update and Import) boot order settings on Fujitsu server equipped with iRMC controller.
+To apply boot order you must know all supported boot options. Current boot order configuration of a specific server can be obtained using property 
+Attributes::PersistentBootConfigOrder of the endpoint: /redfish/v1/Systems/0/Bios
 
 
 ## Schema
@@ -8,11 +10,11 @@ The resource is used to control (Create, Read, Delete, Update and Import) boot o
 ### Required
 
 - `boot_order` (List of String) Boot devices order in BIOS.
-- `system_reset_type` (String) Control how system will be reset to finish boot order change (if host is powered on).
+- `system_reset_type` (String) Control how system will be reset to finish boot order change (if host is powered on). Applicable values are: 'ForceRestart', 'GracefulRestart', 'PowerCycle'.
 
 ### Optional
 
-- `job_timeout` (Number) Timeout in seconds for boot order change to finish.
+- `job_timeout` (Number) Timeout in seconds for boot order change to finish (default 600s).
 - `server` (Block List) List of server BMCs and their respective user credentials (see [below for nested schema](#nestedblock--server))
 
 ### Read-Only
@@ -25,18 +27,16 @@ The resource is used to control (Create, Read, Delete, Update and Import) boot o
 Required:
 
 - `endpoint` (String) Server BMC IP address or hostname
-- `password` (String, Sensitive) User password for login
-- `username` (String) User name for login
 
 Optional:
 
+- `password` (String, Sensitive) User password for login
 - `ssl_insecure` (Boolean) This field indicates whether the SSL/TLS certificate must be verified or not
+- `username` (String) User name for login
 
 ## Import
 
 The resource supports importing boot order configuration from a server.
-Existing boot order configuration of a specific server can be obtained using property Attributes::PersistentBootConfigOrderof
-of the endpoint: /redfish/v1/Systems/0/Bios
 
 To import boot config order, the following syntax is expected to be used:
 ```shell
