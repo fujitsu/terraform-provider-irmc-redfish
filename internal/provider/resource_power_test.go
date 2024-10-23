@@ -27,7 +27,7 @@ func TestAccRedfishIrmcPower(t *testing.T) {
 			}
 			api, err := gofish.Connect(clientConfig)
 			if err != nil {
-				t.Fatalf("Failed to connect to %s: %s", clientConfig.Endpoint, err.Error()) // Zatrzymanie testu przy błędzie
+				t.Fatalf("Failed to connect to %s: %s", clientConfig.Endpoint, err.Error())
 			}
 			defer api.Logout()
 
