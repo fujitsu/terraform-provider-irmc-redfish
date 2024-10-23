@@ -24,6 +24,7 @@ const (
 	bootSourceOverrideName string = "boot_source_override"
 	bootOrderName          string = "boot_order"
 	biosName               string = "bios"
+	userAccount            string = "user_account"
 )
 
 const (
