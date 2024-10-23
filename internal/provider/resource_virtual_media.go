@@ -79,7 +79,7 @@ func VirtualMediaSchema() map[string]schema.Attribute {
 			MarkdownDescription: "Indicates protocol on which the transfer will be done.",
 			Description:         "Indicates protocol on which the transfer will be done.",
 			Validators: []validator.String{
-				stringvalidator.OneOf([]string{"CIFS", "HTTP", "HTTPS", "NFS"}...),
+				stringvalidator.OneOf([]string{"CIFS", "HTTPS", "NFS"}...),
 			},
 		},
 	}
@@ -162,7 +162,7 @@ func GetVirtualMedia(vmediaID string, vms []*redfish.VirtualMedia) (*redfish.Vir
 }
 
 // WaitForMediaSuccessfullyMounted checks requested endpoint of given service
-// until the endpoint will returned Inserted as true or counter will reach limit
+// until the endpoint will returned Inserted as true or counter will reach limit.
 func WaitForMediaSuccessfullyMounted(service *gofish.Service, endpoint string) (*redfish.VirtualMedia, error) {
 	cnt := 20 // number of tries every second
 	virtualMedia, err := redfish.GetVirtualMedia(service.GetClient(), endpoint)
@@ -171,7 +171,7 @@ func WaitForMediaSuccessfullyMounted(service *gofish.Service, endpoint string) (
 			return nil, fmt.Errorf("%d Could not read media state %s due to %w", cnt, endpoint, err)
 		}
 
-		if virtualMedia.Inserted == true {
+		if virtualMedia.Inserted {
 			break
 		}
 
@@ -216,7 +216,7 @@ const (
 )
 
 func (r *VirtualMediaResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
-	tflog.Info(ctx, "virtual-media: create starts")
+	tflog.Info(ctx, "resource-virtual_media: create starts")
 
 	// Read Terraform plan data into the model
 	var plan models.VirtualMediaResourceModel
@@ -225,6 +225,12 @@ func (r *VirtualMediaResource) Create(ctx context.Context, req resource.CreateRe
 	if resp.Diagnostics.HasError() {
 		return
 	}
+
+	// Provide synchronization
+	var endpoint string = plan.RedfishServer[0].Endpoint.ValueString()
+	var resource_name string = "resource-virtual_media"
+	mutexPool.Lock(ctx, endpoint, resource_name)
+	defer mutexPool.Unlock(ctx, endpoint, resource_name)
 
 	// Validate required image and define under which index it could be tried to be mounted
 	image := plan.Image.ValueString()
@@ -278,7 +284,7 @@ func (r *VirtualMediaResource) Create(ctx context.Context, req resource.CreateRe
 				result := r.updateVirtualMediaState(vmedia, plan)
 				diags = resp.State.Set(ctx, &result)
 				resp.Diagnostics.Append(diags...)
-				tflog.Info(ctx, "virtual-media: create ends")
+				tflog.Info(ctx, "resource-virtual_media: create ends")
 				return
 			}
 		}
@@ -289,7 +295,7 @@ func (r *VirtualMediaResource) Create(ctx context.Context, req resource.CreateRe
 }
 
 func (r *VirtualMediaResource) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
-	tflog.Info(ctx, "virtual-media: read starts")
+	tflog.Info(ctx, "resource-virtual_media: read starts")
 
 	// Read Terraform prior state data into the model
 	var state models.VirtualMediaResourceModel
@@ -321,11 +327,11 @@ func (r *VirtualMediaResource) Read(ctx context.Context, req resource.ReadReques
 	// Save updated data into Terraform state
 	new_state := r.updateVirtualMediaState(virtualMedia, state)
 	resp.Diagnostics.Append(resp.State.Set(ctx, &new_state)...)
-	tflog.Info(ctx, "virtual-media: read ends")
+	tflog.Info(ctx, "resource-virtual_media: read ends")
 }
 
 func (r *VirtualMediaResource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
-	tflog.Info(ctx, "virtual-media: update starts")
+	tflog.Info(ctx, "resource-virtual_media: update starts")
 
 	// Read Terraform plan
 	var plan models.VirtualMediaResourceModel
@@ -345,18 +351,13 @@ func (r *VirtualMediaResource) Update(ctx context.Context, req resource.UpdateRe
 	// Validate required image and define under which index it could be tried to be mounted
 	image := plan.Image.ValueString()
 	var imageType VmediaImageType = IMAGE_TYPE_UNKNOWN
-	redfish_index := 0
 	if strings.HasSuffix(image, ".iso") {
 		imageType = IMAGE_TYPE_ISO
-		redfish_index = 0
 	} else {
 		if strings.HasSuffix(image, ".img") {
 			imageType = IMAGE_TYPE_IMG
-			redfish_index = 1
 		}
 	}
-
-	redfish_index = redfish_index + 1
 
 	if imageType == IMAGE_TYPE_UNKNOWN {
 		resp.Diagnostics.AddError("Image type format is not supported", "Only .iso and .img formats are supported")
@@ -411,11 +412,11 @@ func (r *VirtualMediaResource) Update(ctx context.Context, req resource.UpdateRe
 	result := r.updateVirtualMediaState(vmedia, state)
 	diags = resp.State.Set(ctx, &result)
 	resp.Diagnostics.Append(diags...)
-	tflog.Info(ctx, "virtual-media: update ends")
+	tflog.Info(ctx, "resource-virtual_media: update ends")
 }
 
 func (r *VirtualMediaResource) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {
-	tflog.Info(ctx, "virtual-media: delete starts")
+	tflog.Info(ctx, "resource-virtual_media: delete starts")
 
 	// Read Terraform prior state data into the model
 	var state models.VirtualMediaResourceModel
@@ -450,18 +451,13 @@ func (r *VirtualMediaResource) Delete(ctx context.Context, req resource.DeleteRe
 	result := r.updateVirtualMediaState(vmedia, state)
 	diags = resp.State.Set(ctx, &result)
 	resp.Diagnostics.Append(diags...)
-	tflog.Info(ctx, "virtual_media: delete ends")
-}
-
-type VMediaImportConfig struct {
-	ServerConfig
-	ID string `json:"id"`
+	tflog.Info(ctx, "resource-virtual_media: delete ends")
 }
 
 func (r *VirtualMediaResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
-	tflog.Info(ctx, "virtual_media: import starts")
+	tflog.Info(ctx, "resource-virtual_media: import starts")
 
-	var config VMediaImportConfig
+	var config CommonImportConfig
 	err := json.Unmarshal([]byte(req.ID), &config)
 	if err != nil {
 		resp.Diagnostics.AddError("Error while 2 unmarshalling import config", err.Error())
@@ -507,5 +503,5 @@ func (r *VirtualMediaResource) ImportState(ctx context.Context, req resource.Imp
 	diags := resp.State.Set(ctx, &result)
 	resp.Diagnostics.Append(diags...)
 
-	tflog.Info(ctx, "virtual_media: import ends")
+	tflog.Info(ctx, "resource-virtual_media: import ends")
 }

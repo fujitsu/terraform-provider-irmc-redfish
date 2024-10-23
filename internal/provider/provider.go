@@ -5,10 +5,8 @@ package provider
 
 import (
 	"context"
-	//	"net/http"
 
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
-	//	"github.com/hashicorp/terraform-plugin-framework/function"
 	"github.com/hashicorp/terraform-plugin-framework/provider"
 	"github.com/hashicorp/terraform-plugin-framework/provider/schema"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
@@ -19,28 +17,30 @@ import (
 // Ensure IrmcProvider satisfies various provider interfaces.
 var _ provider.Provider = &IrmcProvider{}
 
-//var _ provider.ProviderWithFunctions = &IrmcProvider{}
+var mutexPool = InitSyncPoolInstance()
 
 // IrmcProvider defines the provider implementation.
 type IrmcProvider struct {
 	// version is set to the provider version on release, "dev" when the
 	// provider is built and ran locally, and "test" when running acceptance
 	// testing.
-	version  string
+	version string
+
 	Username string
 	Password string
-	//	Endpoint string
 }
 
 // IrmcProviderModel describes the provider data model.
 type IrmcProviderModel struct {
 	Username types.String `tfsdk:"username"`
 	Password types.String `tfsdk:"password"`
-	//	Endpoint types.String `tfsdk:"endpoint"`
 }
 
 func (p *IrmcProvider) Metadata(ctx context.Context, req provider.MetadataRequest, resp *provider.MetadataResponse) {
+	// Here is provider name -------------------
 	resp.TypeName = "irmc-redfish_"
+	// Above is provider name ------------------
+
 	resp.Version = p.version
 }
 
@@ -48,20 +48,15 @@ func (p *IrmcProvider) Schema(ctx context.Context, req provider.SchemaRequest, r
 	resp.Schema = schema.Schema{
 		Attributes: map[string]schema.Attribute{
 			"username": schema.StringAttribute{
-				MarkdownDescription: "",
+				MarkdownDescription: "Username accessing Redfish API",
 				Description:         "Username accessing Redfish API",
 				Optional:            true,
 			},
 			"password": schema.StringAttribute{
-				MarkdownDescription: "",
+				MarkdownDescription: "Password related to given user name accessing Redfish API",
 				Description:         "Password related to given user name accessing Redfish API",
 				Optional:            true,
 			},
-			//			"endpoint": schema.StringAttribute{
-			//				MarkdownDescription: "",
-			//				Description:         "Redfish API address",
-			//				Optional:            true,
-			//			},
 		},
 	}
 }
@@ -109,6 +104,12 @@ func (p *IrmcProvider) Configure(ctx context.Context, req provider.ConfigureRequ
 func (p *IrmcProvider) Resources(ctx context.Context) []func() resource.Resource {
 	return []func() resource.Resource{
 		NewVirtualMediaResource,
+		NewPowerResource,
+		NewIrmcRestartResource,
+		NewBootSourceOverrideResource,
+		NewBootOrderResource,
+		NewBiosResource,
+		NewUserAccountResource,
 		NewStorageVolumeResource,
 	}
 }

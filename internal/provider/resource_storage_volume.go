@@ -247,7 +247,7 @@ func validateRequestAgainstStorageControllerCapabilities(ctx context.Context, se
 
 // verifyRequestedDisks verifies requested plan around disks vs disks attached to
 // requested storage controller and returns slice of physical_disk_group if all disks
-// have been found on target
+// have been found on target.
 func verifyRequestedDisks(ctx context.Context, plan models.StorageVolumeResourceModel, storage *redfish.Storage) ([]physical_disk_group, error) {
 	var plan_physical_disks []string
 	plan.PhysicalDrives.ElementsAs(ctx, &plan_physical_disks, true)
@@ -337,7 +337,7 @@ func verifyRequestedDisks(ctx context.Context, plan models.StorageVolumeResource
 }
 
 // getNewVolumeConfigFromPlan based on plan and already converted list of disks in physical_disks
-// returns map containing whole request as map
+// returns map containing whole request as map.
 func getNewVolumeConfigFromPlan(plan models.StorageVolumeResourceModel,
 	physical_disks []physical_disk_group) map[string]interface{} {
 
@@ -402,7 +402,7 @@ func WaitForRedfishTaskEnd(ctx context.Context, service *gofish.Service, locatio
 }
 
 // getVolumesIdsList access requested storage_id and returns slice of available volumes
-// by their @odata.id
+// by their @odata.id.
 func getVolumesIdsList(service *gofish.Service, storage_id string) (out []string, diags diag.Diagnostics) {
 	storage, err := GetSystemStorageResource(service, storage_id)
 	if err != nil {
@@ -423,7 +423,7 @@ func getVolumesIdsList(service *gofish.Service, storage_id string) (out []string
 }
 
 // getRecentlyCreatedVolumeId compares two slices of volumes and returned the one
-// which is new
+// which is new.
 func getRecentlyCreatedVolumeId(ids_after, ids_before []string) string {
 	diff := difference(ids_after, ids_before)
 	if len(diff) > 0 {
@@ -433,7 +433,7 @@ func getRecentlyCreatedVolumeId(ids_after, ids_before []string) string {
 	return ""
 }
 
-// createStorageVolume tries to create volume inside of service according to plan
+// createStorageVolume tries to create volume inside of service according to plan.
 func createStorageVolume(ctx context.Context, service *gofish.Service,
 	plan models.StorageVolumeResourceModel) (diags diag.Diagnostics) {
 
@@ -482,7 +482,7 @@ func createStorageVolume(ctx context.Context, service *gofish.Service,
 	return diags
 }
 
-// deleteStorageVolume tries to destroy volume_endpoint in service
+// deleteStorageVolume tries to destroy volume_endpoint in service.
 func deleteStorageVolume(ctx context.Context, service *gofish.Service,
 	volume_endpoint string) diag.Diagnostics {
 	var diags diag.Diagnostics
@@ -537,7 +537,7 @@ func doesVolumeStillExist(service *gofish.Service, volume_endpoint string) (volu
 	return volume, diags, false
 }
 
-// getStorageIdFromVolumeODataId tries to read storage id out of volumeOdataId
+// getStorageIdFromVolumeODataId tries to read storage id out of volumeOdataId.
 func getStorageIdFromVolumeODataId(volumeOdataId string) string {
 	suffix := strings.Index(volumeOdataId, "/Volume")
 	output := volumeOdataId[:suffix]
@@ -548,7 +548,7 @@ func getStorageIdFromVolumeODataId(volumeOdataId string) string {
 	return output
 }
 
-// readStorageVolumeToState reads current volume configuration to terraform state
+// readStorageVolumeToState reads current volume configuration to terraform state.
 func readStorageVolumeToState(volume *redfish.Volume, state *models.StorageVolumeResourceModel) (diags diag.Diagnostics) {
 
 	state.StorageId = types.StringValue(getStorageIdFromVolumeODataId(volume.ODataID))
@@ -613,7 +613,7 @@ func compareVolumePropertiesWithPlan(ctx context.Context, service *gofish.Servic
 }
 
 // updateStorageVolume applies change on volume properties and verifies if planned
-// changes are reflected by Redfish volume endpoint
+// changes are reflected by Redfish volume endpoint.
 func updateStorageVolume(ctx context.Context, service *gofish.Service, state *models.StorageVolumeResourceModel,
 	plan *models.StorageVolumeResourceModel) (diags diag.Diagnostics) {
 	payload := map[string]interface{}{

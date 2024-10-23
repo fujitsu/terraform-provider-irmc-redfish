@@ -6,8 +6,8 @@ The resource is used to control (read, mount, unmount or modify) virtual media o
 
 ### Required
 
-- `image` (String) URI of the remote media to be used for mounting.
-- `transfer_protocol_type` (String) Indicates protocol on which the transfer will be done.
+- `image` (String) URI of the remote media to be used for mounting (.iso or .img).
+- `transfer_protocol_type` (String) Indicates protocol on which the transfer will be done (CIFS, HTTPS, NFS).
 
 ### Optional
 
@@ -24,9 +24,9 @@ The resource is used to control (read, mount, unmount or modify) virtual media o
 Required:
 
 - `endpoint` (String) Server BMC IP address or hostname
-- `password` (String, Sensitive) User password for login
-- `username` (String) User name for login
 
 Optional:
 
+- `password` (String, Sensitive) User password for login
 - `ssl_insecure` (Boolean) This field indicates whether the SSL/TLS certificate must be verified or not
+- `username` (String) User name for login

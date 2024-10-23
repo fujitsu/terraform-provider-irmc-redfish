@@ -1,25 +1,38 @@
 package provider
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"io"
 	"net/http"
 	"terraform-provider-irmc-redfish/internal/models"
+	"time"
 
 	"github.com/hashicorp/terraform-plugin-framework-validators/listvalidator"
 	datasourceSchema "github.com/hashicorp/terraform-plugin-framework/datasource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	resourceSchema "github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
+	"github.com/hashicorp/terraform-plugin-log/tflog"
 	"github.com/stmcginnis/gofish"
 	"github.com/stmcginnis/gofish/redfish"
 )
 
 const (
-	redfishServerMD   string = "List of server BMCs and their respective user credentials"
-	vmediaName        string = "virtual_media"
-	storageVolumeName string = "storage_volume"
+	redfishServerMD        string = "List of server BMCs and their respective user credentials"
+	vmediaName             string = "virtual_media"
+	storageVolumeName      string = "storage_volume"
+	irmcRestart            string = "irmc_reset"
+	bootSourceOverrideName string = "boot_source_override"
+	bootOrderName          string = "boot_order"
+	biosName               string = "bios"
+	userAccount            string = "user_account"
+)
+
+const (
+	HTTP_HEADER_IF_MATCH = "If-Match"
+	HTTP_HEADER_ETAG     = "ETag"
 )
 
 type ServerConfig struct {
@@ -29,7 +42,12 @@ type ServerConfig struct {
 	SslInsecure bool   `json:"ssl_insecure"`
 }
 
-// RedfishServerDatasourceSchema to construct schema of redfish server
+type CommonImportConfig struct {
+	ServerConfig
+	ID string `json:"id"`
+}
+
+// RedfishServerDatasourceSchema to construct schema of redfish server.
 func RedfishServerDatasourceSchema() map[string]datasourceSchema.Attribute {
 	return map[string]datasourceSchema.Attribute{
 		"username": datasourceSchema.StringAttribute{
@@ -55,11 +73,11 @@ func RedfishServerDatasourceSchema() map[string]datasourceSchema.Attribute {
 func RedfishServerSchema() map[string]resourceSchema.Attribute {
 	return map[string]resourceSchema.Attribute{
 		"username": resourceSchema.StringAttribute{
-			Required:    true,
+			Optional:    true,
 			Description: "User name for login",
 		},
 		"password": resourceSchema.StringAttribute{
-			Required:    true,
+			Optional:    true,
 			Description: "User password for login",
 			Sensitive:   true,
 		},
@@ -74,7 +92,7 @@ func RedfishServerSchema() map[string]resourceSchema.Attribute {
 	}
 }
 
-// RedfishServerDatasourceBlockMap to construct common lock map for data sources
+// RedfishServerDatasourceBlockMap to construct common lock map for data sources.
 func RedfishServerDatasourceBlockMap() map[string]datasourceSchema.Block {
 	return map[string]datasourceSchema.Block{
 		"server": datasourceSchema.ListNestedBlock{
@@ -154,6 +172,7 @@ func ConnectTargetSystem(pconfig *IrmcProvider, rserver *[]models.RedfishServer)
 	return api, nil
 }
 
+// GetSystemResource returns ComputerSystem resource from target defined by service.
 func GetSystemResource(service *gofish.Service) (*redfish.ComputerSystem, error) {
 	systems, err := service.Systems()
 	if err != nil {
@@ -185,7 +204,7 @@ func difference(a, b []string) []string {
 
 // IsTaskFinished returns information whether task state
 // has been mapped to task finished state and the information
-// is returned as boolean
+// is returned as boolean.
 func IsTaskFinished(state redfish.TaskState) bool {
 	switch state {
 	case redfish.CompletedTaskState, redfish.ExceptionTaskState, redfish.CancelledTaskState, redfish.KilledTaskState:
@@ -200,7 +219,7 @@ func IsTaskFinished(state redfish.TaskState) bool {
 
 // IsTaskFinishedSuccessfully returns information whether task state
 // has been mapped to task finished successfully or not and the information
-// is returned as boolean
+// is returned as boolean.
 func IsTaskFinishedSuccessfully(state redfish.TaskState) bool {
 	switch state {
 	case redfish.CompletedTaskState:
@@ -235,4 +254,24 @@ func FetchRedfishTaskLog(service *gofish.Service, location string) (logs []byte,
 		diags.AddError("Error while reading task logs", "Endpoint returned non 200 code")
 		return nil, diags
 	}
+}
+
+func retryConnectWithTimeout(ctx context.Context, pconfig *IrmcProvider, rserver *[]models.RedfishServer) (*gofish.APIClient, error) {
+	startTime := time.Now()
+	var apiClient *gofish.APIClient
+	var err error
+	timeout := 10 * time.Minute
+
+	for time.Since(startTime) < timeout {
+		apiClient, err = ConnectTargetSystem(pconfig, rserver)
+		if err == nil {
+			tflog.Info(ctx, "Successfully connected to the IRMC system.")
+			return apiClient, nil
+		}
+
+		tflog.Warn(ctx, fmt.Sprintf("Failed to connect to the IRMC system: %s. Retrying in 30 seconds...", err.Error()))
+		time.Sleep(30 * time.Second)
+	}
+
+	return nil, fmt.Errorf("connection timed out after 10 minutes: %w", err)
 }

@@ -9,6 +9,7 @@ NAMESPACE=fujitsu
 default: testacc
 
 # Run acceptance tests
+# to run choosen tests: TESTARGS="-run *TestName*" make testacc
 .PHONY: testacc
 testacc:
 	TF_ACC=1 TF_LOG=INFO go test ./... $(TESTARGS) -timeout 120m -count=1
@@ -20,6 +21,10 @@ lint:
 .PHONY: doc
 doc:
 	go generate
+
+.PHONY: fmt
+fmt:
+	gofmt -w internal/
 
 .PHONY: build
 build:

@@ -1,0 +1,27 @@
+default:
+  image: golang:alpine
+
+variables:
+  GOLANGCI_LINT_VERSION: 'v1.61.0'
+
+stages:
+    - build
+    - validate
+
+build-sources:
+  stage: build
+  script:
+    - apk update
+    - echo "Build provider..."
+    - go build -v .
+
+validate-sources:
+  image: golangci/golangci-lint:$GOLANGCI_LINT_VERSION
+  stage: validate
+  script:
+    - golangci-lint run --print-issued-lines=false --out-format code-climate:gl-code-quality-report.json,line-number
+  artifacts:
+    reports:
+      codequality: gl-code-quality-report.json
+    paths:
+      - gl-code-quality-report.json

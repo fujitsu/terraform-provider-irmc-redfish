@@ -149,6 +149,25 @@ func testAccPrepareStorageVolume(creds TestingServerCredentials) {
 	}
 }
 
+func testChangePowerHostState(creds TestingServerCredentials, poweredOn bool) {
+	clientConfig := gofish.ClientConfig{
+		Endpoint:  "https://" + creds.Endpoint,
+		Username:  creds.Username,
+		Password:  creds.Password,
+		BasicAuth: true,
+		Insecure:  true,
+	}
+
+	api, err := gofish.Connect(clientConfig)
+	if err != nil {
+		log.Printf("Connect to %s reported error %s", clientConfig.Endpoint, err.Error())
+		return
+	}
+	if err = changePowerState(api.Service, poweredOn, 100); err != nil {
+		log.Printf("Could not change power state %s", err.Error())
+	}
+}
+
 func init() {
 	err := godotenv.Load("redfish_test.env")
 	if err != nil {
