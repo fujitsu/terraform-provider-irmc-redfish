@@ -7,18 +7,14 @@ resource "irmc-redfish_storage_volume" "volume" {
     ssl_insecure = each.value.ssl_insecure
   }
 
-  storage_controller_id = "1" //"PRAID EP640i (0)"
-  raid_type             = "RAID0"
-  capacity_bytes        = 2000000000
-  name                  = "new-volume"
+  storage_controller_id = "0" //"PRAID EP640i (0)"
+  raid_type             = "RAID1"
+  capacity_bytes        = 100000000000
+  name                  = "new-volume22"
   init_mode             = "Fast"
   optimum_io_size_bytes = 65536
   read_mode             = "ReadAhead"
   write_mode            = "WriteThrough"
-  cache_mode            = "Direct"
 
-  physical_drives = ["[\"0\", \"1\"]"]
-  lifecycle {
-    ignore_changes = [capacity_bytes, physical_drives]
-  }
+  physical_drives = ["[\"6\", \"7\"]"]
 }

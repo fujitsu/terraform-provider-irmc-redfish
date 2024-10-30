@@ -3,6 +3,7 @@ package models
 import (
 	"context"
 	"fmt"
+	"math"
 
 	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/diag"
@@ -73,13 +74,13 @@ func (v CapacityByteValue) Int64SemanticEquals(_ context.Context, newValueable b
 		return false, diags
 	}
 
-	diff := v.Int64Value.ValueInt64() - newValue.ValueInt64()
-	if diff < 50000000 {
-		//        diags.AddWarning("Int64SemanticsEquals", "Difference is ok!")
+	diff := math.Abs(float64(v.Int64Value.ValueInt64() - newValue.ValueInt64()))
+	if diff < 500000000 {
 		return true, diags
 	}
 
-	diags.AddError("Int64SemanticsEquals", "Difference too big (>50000000 bytes)")
+	var buff string = fmt.Sprintf("Current volume capacity differs too much vs requested value (%f bytes while allowed 500000000 bytes)", diff)
+	diags.AddError("Int64SemanticsEquals", buff)
 	return false, diags
 }
 
