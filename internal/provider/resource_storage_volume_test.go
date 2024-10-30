@@ -12,7 +12,7 @@ const (
 	storage_volume_resource_name = "irmc-redfish_storage_volume.volume"
 )
 
-// These tests are very hardware dependent (controller existance, id, disks etc.) so be
+// These tests are very hardware dependent (controller existance, id, disks etc.) so be.
 func TestAccRedfishStorageVolume_basic(t *testing.T) {
 	resource.Test(t, resource.TestCase{
 		PreCheck:                 func() { testAccPrepareStorageVolume(creds) },
