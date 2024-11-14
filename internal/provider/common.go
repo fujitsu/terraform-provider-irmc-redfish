@@ -42,6 +42,7 @@ const (
 	bootOrderName          string = "boot_order"
 	biosName               string = "bios"
 	userAccount            string = "user_account"
+	simpleUpdate           string = "simple_update"
 )
 
 const (
