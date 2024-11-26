@@ -375,40 +375,6 @@ func getNewVolumeConfigFromPlan(plan models.StorageVolumeResourceModel,
 	return volume_config
 }
 
-// WaitForRedfishTaskEnd checks in loop until task pointed by location on service
-// will report finished state or operation will timeout (maximum time pointed by timeout_s).
-// If task has been finished with success, status is returned as true. If loop has timed or
-// information about task could not be retrieved, status will be returned as false with error
-// pointing to reason.
-func WaitForRedfishTaskEnd(ctx context.Context, service *gofish.Service, location string, timeout_s int64) (bool, error) {
-	start_time := time.Now().Unix()
-	for {
-		task, err := redfish.GetTask(service.GetClient(), location)
-		if err != nil {
-			return false, fmt.Errorf("Error during task %s retrieval %s", location, err.Error())
-		}
-
-		tflog.Trace(ctx, "Task details", map[string]interface{}{
-			"location": location,
-			"state":    task.TaskState,
-		})
-
-		if IsTaskFinished(task.TaskState) {
-			if IsTaskFinishedSuccessfully(task.TaskState) {
-				return true, nil
-			}
-
-			return false, fmt.Errorf("Task finished with TaskState %s", task.TaskState)
-		} else {
-			time.Sleep(5 * time.Second)
-		}
-
-		if time.Now().Unix()-start_time > timeout_s {
-			return false, fmt.Errorf("Task has not finished within given timeout %d", timeout_s)
-		}
-	}
-}
-
 // getVolumesIdsList access requested storage_id and returns slice of available volumes
 // by their @odata.id.
 func getVolumesIdsList(service *gofish.Service, storage_id string) (out []string, diags diag.Diagnostics) {
@@ -441,27 +407,10 @@ func getRecentlyCreatedVolumeId(ids_after, ids_before []string) string {
 	return ""
 }
 
-// createStorageVolume tries to create volume inside of service according to plan.
-func createStorageVolume(ctx context.Context, service *gofish.Service,
-	plan models.StorageVolumeResourceModel) (diags diag.Diagnostics) {
-
-	storage_id := plan.StorageId.ValueString()
-	volumes_collection_endpoint := STORAGE_COLLECTION_ENDPOINT + "/" +
-		plan.StorageId.ValueString() + "/Volumes"
-
-	physical_disk_groups, err := validateRequestAgainstStorageControllerCapabilities(ctx, service, storage_id, plan)
-	if err != nil {
-		diags.AddError("Error during request validation", err.Error())
-		return diags
-	}
-
-	new_volume_payload := getNewVolumeConfigFromPlan(plan, physical_disk_groups)
-
-	tflog.Info(ctx, "Volume create request details", map[string]interface{}{
-		"endpoint": volumes_collection_endpoint,
-		"payload":  new_volume_payload,
-	})
-
+// requestVolumeCreationAndSuperviseCreation sends creation request and waits until created task
+// will finish
+func requestVolumeCreationAndSuperviseCreation(ctx context.Context, service *gofish.Service,
+	volumes_collection_endpoint string, new_volume_payload map[string]interface{}) (diags diag.Diagnostics) {
 	res, err := service.GetClient().Post(volumes_collection_endpoint, new_volume_payload)
 	if err != nil {
 		diags.AddError("Error while requesting POST on volume collection", err.Error())
@@ -486,8 +435,31 @@ func createStorageVolume(ctx context.Context, service *gofish.Service,
 	} else {
 		diags.AddError("POST request on volume collection finished with error", "Non 200")
 	}
-
 	return diags
+}
+
+// createStorageVolume tries to create volume inside of service according to plan.
+func createStorageVolume(ctx context.Context, service *gofish.Service,
+	plan models.StorageVolumeResourceModel) (diags diag.Diagnostics) {
+
+	storage_id := plan.StorageId.ValueString()
+	volumes_collection_endpoint := STORAGE_COLLECTION_ENDPOINT + "/" +
+		plan.StorageId.ValueString() + "/Volumes"
+
+	physical_disk_groups, err := validateRequestAgainstStorageControllerCapabilities(ctx, service, storage_id, plan)
+	if err != nil {
+		diags.AddError("Error during request validation", err.Error())
+		return diags
+	}
+
+	new_volume_payload := getNewVolumeConfigFromPlan(plan, physical_disk_groups)
+
+	tflog.Info(ctx, "Volume create request details", map[string]interface{}{
+		"endpoint": volumes_collection_endpoint,
+		"payload":  new_volume_payload,
+	})
+
+	return requestVolumeCreationAndSuperviseCreation(ctx, service, volumes_collection_endpoint, new_volume_payload)
 }
 
 // deleteStorageVolume tries to destroy volume_endpoint in service.
@@ -711,7 +683,7 @@ func StorageVolumeSchema() map[string]schema.Attribute {
 			MarkdownDescription: "Slot location of the disk",
 			ElementType:         types.StringType,
 			Validators: []validator.List{
-				listvalidator.SizeAtLeast(1), // no possibility to do more validation at this level
+				listvalidator.SizeAtLeast(1),
 			},
 			PlanModifiers: []planmodifier.List{
 				listplanmodifier.RequiresReplace(),
