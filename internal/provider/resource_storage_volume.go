@@ -408,7 +408,7 @@ func getRecentlyCreatedVolumeId(ids_after, ids_before []string) string {
 }
 
 // requestVolumeCreationAndSuperviseCreation sends creation request and waits until created task
-// will finish
+// will finish.
 func requestVolumeCreationAndSuperviseCreation(ctx context.Context, service *gofish.Service,
 	volumes_collection_endpoint string, new_volume_payload map[string]interface{}) (diags diag.Diagnostics) {
 	res, err := service.GetClient().Post(volumes_collection_endpoint, new_volume_payload)
