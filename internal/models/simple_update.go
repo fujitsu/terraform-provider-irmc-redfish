@@ -21,12 +21,13 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/types"
 )
 
-// VirtualMediaResourceModel describes the resource data model.
-type BootSourceOverrideResourceModel struct {
-	Id                        types.String    `tfsdk:"id"`
-	RedfishServer             []RedfishServer `tfsdk:"server"`
-	BootSourceOverrideTarget  types.String    `tfsdk:"boot_source_override_target"`
-	BootSourceOverrideEnabled types.String    `tfsdk:"boot_source_override_enabled"`
-	SystemResetType           types.String    `tfsdk:"system_reset_type"`
-	JobTimeout                types.Int64     `tfsdk:"job_timeout"`
+// SimpleUpdateResourceModel describes the resource data model.
+type SimpleUpdateResourceModel struct {
+	Id             types.String    `tfsdk:"id"`
+	RedfishServer  []RedfishServer `tfsdk:"server"`
+	Protocol       types.String    `tfsdk:"transfer_protocol"`
+	UpdateImage    types.String    `tfsdk:"update_image"`
+	OperationTime  types.String    `tfsdk:"operation_apply_time"`
+	UpdateTimeout  types.Int64     `tfsdk:"update_timeout"`
+	UmeToolDirName types.String    `tfsdk:"ume_tool_directory_name"`
 }

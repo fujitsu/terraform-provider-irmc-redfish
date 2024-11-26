@@ -15,18 +15,16 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package models
+resource "irmc-redfish_simple_update" "s_update" {
+  for_each = var.rack1
+  server {
+    username     = each.value.username
+    password     = each.value.password
+    endpoint     = each.value.endpoint
+    ssl_insecure = each.value.ssl_insecure
+  }
 
-import (
-	"github.com/hashicorp/terraform-plugin-framework/types"
-)
-
-// VirtualMediaResourceModel describes the resource data model.
-type BootSourceOverrideResourceModel struct {
-	Id                        types.String    `tfsdk:"id"`
-	RedfishServer             []RedfishServer `tfsdk:"server"`
-	BootSourceOverrideTarget  types.String    `tfsdk:"boot_source_override_target"`
-	BootSourceOverrideEnabled types.String    `tfsdk:"boot_source_override_enabled"`
-	SystemResetType           types.String    `tfsdk:"system_reset_type"`
-	JobTimeout                types.Int64     `tfsdk:"job_timeout"`
+  ume_tool_directory_name = "Hello"
+  transfer_protocol       = "http"
+  update_image            = "10.172.181.97:8080/BIOS/D3931_C1_1_50_BIOS.zip"
 }
