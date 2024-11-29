@@ -99,9 +99,9 @@ func (v CapacityByteValue) Type(ctx context.Context) attr.Type {
 
 // VirtualMediaResourceModel describes the resource data model.
 type StorageVolumeResourceModel struct {
-	Id            types.String    `tfsdk:"id"`
-	StorageId     types.String    `tfsdk:"storage_controller_id"`
-	RedfishServer []RedfishServer `tfsdk:"server"`
+	Id                  types.String    `tfsdk:"id"`
+	StorageControllerSN types.String    `tfsdk:"storage_controller_serial_number"`
+	RedfishServer       []RedfishServer `tfsdk:"server"`
 
 	RaidType           types.String      `tfsdk:"raid_type"`
 	CapacityBytes      CapacityByteValue `tfsdk:"capacity_bytes"`

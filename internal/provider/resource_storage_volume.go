@@ -102,20 +102,20 @@ func (r *StorageVolumeResource) updateStorageVolumeState(
 	volume_endpoint string) models.StorageVolumeResourceModel {
 
 	return models.StorageVolumeResourceModel{
-		Id:        types.StringValue(volume_endpoint),
-		StorageId: plan.StorageId,
+		Id:                  types.StringValue(volume_endpoint),
+		StorageControllerSN: plan.StorageControllerSN,
 
 		RaidType:           plan.RaidType,
 		VolumeName:         plan.VolumeName,
 		PhysicalDrives:     plan.PhysicalDrives,
 		OptimumIOSizeBytes: plan.OptimumIOSizeBytes,
+		InitMode:           plan.InitMode, // information not preserved in Redfish
 
 		CapacityBytes: target_volume_state.CapacityBytes,
 
 		// Property marked as Computed are expected to return real values
 		ReadMode:       target_volume_state.ReadMode,
 		WriteMode:      target_volume_state.WriteMode,
-		InitMode:       target_volume_state.InitMode,
 		DriveCacheMode: target_volume_state.DriveCacheMode,
 
 		RedfishServer: plan.RedfishServer,
@@ -135,6 +135,26 @@ func GetSystemStorageResource(service *gofish.Service, storage_id string) (*redf
 
 	for _, storage := range list_of_storage_controllers {
 		if storage.ID == storage_id {
+			return storage, nil
+		}
+	}
+
+	return nil, fmt.Errorf("Requested Storage resource has not been found on list")
+}
+
+func GetSystemStorageResourceFromSerial(service *gofish.Service, serial string) (*redfish.Storage, error) {
+	system, err := GetSystemResource(service)
+	if err != nil {
+		return nil, err
+	}
+
+	list_of_storage_controllers, err := system.Storage()
+	if err != nil {
+		return nil, err
+	}
+
+	for _, storage := range list_of_storage_controllers {
+		if storage.StorageControllers[0].SerialNumber == serial {
 			return storage, nil
 		}
 	}
@@ -169,6 +189,15 @@ func getSystemStorageOemRaidCapabilitiesResource(service *gofish.Service, endpoi
 	return config, nil
 }
 
+func getVolumesCollectionUrl(service *gofish.Service, serial string) (url string, err error) {
+	storage, err := GetSystemStorageResourceFromSerial(service, serial)
+	if err != nil {
+		return "", fmt.Errorf("Storage resource could not be obtained %s", err.Error())
+	}
+
+	return storage.ODataID + "/Volumes", err
+}
+
 // validateRequestAgainstStorageControllerCapabilities validates plan
 // what target controller reports as supported. If validation has been successful,
 // function returns slice of physical_disk_group.
@@ -176,7 +205,7 @@ func validateRequestAgainstStorageControllerCapabilities(ctx context.Context, se
 	storage_id string, plan models.StorageVolumeResourceModel) ([]physical_disk_group, error) {
 	physical_disk_groups := []physical_disk_group{}
 
-	storage, err := GetSystemStorageResource(service, storage_id)
+	storage, err := GetSystemStorageResourceFromSerial(service, storage_id)
 	if err != nil {
 		return physical_disk_groups, fmt.Errorf("Storage resource could not be obtained %s", err.Error())
 	}
@@ -239,6 +268,12 @@ func validateRequestAgainstStorageControllerCapabilities(ctx context.Context, se
 
 	if !validated_optimum_io_size_bytes {
 		return physical_disk_groups, fmt.Errorf("optimum_io_size_bytes has not been successfully validated against controller possibilities '%v'", capabilities.RaidLevelCap)
+	}
+
+	if !plan.CapacityBytes.IsUnknown() {
+		if strings.Contains(storage.Name, "PDUAL CP100") {
+			return physical_disk_groups, fmt.Errorf("PDUAL CP100 controller supports only full volumes (capacity_bytes cannot be specified)")
+		}
 	}
 
 	return physical_disk_groups, nil
@@ -392,7 +427,7 @@ func getNewVolumeConfigFromPlan(plan models.StorageVolumeResourceModel,
 // getVolumesIdsList access requested storage_id and returns slice of available volumes
 // by their @odata.id.
 func getVolumesIdsList(service *gofish.Service, storage_id string) (out []string, diags diag.Diagnostics) {
-	storage, err := GetSystemStorageResource(service, storage_id)
+	storage, err := GetSystemStorageResourceFromSerial(service, storage_id)
 	if err != nil {
 		diags.AddError("Could not obtain storage controller with requested id", err.Error())
 		return
@@ -452,13 +487,36 @@ func requestVolumeCreationAndSuperviseCreation(ctx context.Context, service *gof
 	return diags
 }
 
+// getValidStorageEndpointFromSerial returns storage which represents itself
+// with requested serial number.
+func getValidStorageEndpointFromSerial(service *gofish.Service, storage_serial string) (endpoint string, err error) {
+	storage, err := GetSystemStorageResourceFromSerial(service, storage_serial)
+	if err != nil {
+		return "", err
+	}
+
+	return storage.ODataID, err
+}
+
+// updateVolumeODataId checks if previously used endpoint still points to same
+// controller. If not, it produces valid endpoint to same volume.
+func updateVolumeODataId(validStorageEndpoint string, state *models.StorageVolumeResourceModel) bool {
+	knownVolumeId := state.Id.ValueString()
+	if strings.Contains(knownVolumeId, validStorageEndpoint) {
+		return false
+	}
+
+	newODataId := validStorageEndpoint + "/Volumes/" + getStorageIdFromVolumeODataId(knownVolumeId)
+	state.Id = types.StringValue(newODataId)
+
+	return true
+}
+
 // createStorageVolume tries to create volume inside of service according to plan.
 func createStorageVolume(ctx context.Context, service *gofish.Service,
 	plan models.StorageVolumeResourceModel) (diags diag.Diagnostics) {
 
-	storage_id := plan.StorageId.ValueString()
-	volumes_collection_endpoint := STORAGE_COLLECTION_ENDPOINT + "/" +
-		plan.StorageId.ValueString() + "/Volumes"
+	storage_id := plan.StorageControllerSN.ValueString()
 
 	physical_disk_groups, err := validateRequestAgainstStorageControllerCapabilities(ctx, service, storage_id, plan)
 	if err != nil {
@@ -467,6 +525,12 @@ func createStorageVolume(ctx context.Context, service *gofish.Service,
 	}
 
 	new_volume_payload := getNewVolumeConfigFromPlan(plan, physical_disk_groups)
+
+	volumes_collection_endpoint, err := getVolumesCollectionUrl(service, storage_id)
+	if err != nil {
+		diags.AddError("Could not obtain volumes url", err.Error())
+		return diags
+	}
 
 	tflog.Info(ctx, "Volume create request details", map[string]interface{}{
 		"endpoint": volumes_collection_endpoint,
@@ -543,13 +607,13 @@ func getStorageIdFromVolumeODataId(volumeOdataId string) string {
 }
 
 // readStorageVolumeToState reads current volume configuration to terraform state.
-func readStorageVolumeToState(volume *redfish.Volume, state *models.StorageVolumeResourceModel) (diags diag.Diagnostics) {
+func readStorageVolumeToState(volume *redfish.Volume, storage_serial string,
+	state *models.StorageVolumeResourceModel) (diags diag.Diagnostics) {
 
-	state.StorageId = types.StringValue(getStorageIdFromVolumeODataId(volume.ODataID))
+	state.StorageControllerSN = types.StringValue(storage_serial)
 	state.VolumeName = types.StringValue(volume.Name)
 	state.OptimumIOSizeBytes = types.Int64Value(int64(volume.OptimumIOSizeBytes))
 
-	//state.CapacityBytes = models.CapacityByteValue{types.Int64Value(int64(volume.CapacityBytes))}
 	state.CapacityBytes = models.CapacityByteValue{Int64Value: types.Int64Value(int64(volume.CapacityBytes))}
 
 	// Theoretically volume can be migrated to different RAID type
@@ -589,8 +653,9 @@ func compareVolumePropertiesWithPlan(ctx context.Context, service *gofish.Servic
 		}
 
 		// Verify if plan has been applied
-		if volume.Name == plan.VolumeName.ValueString() &&
-			volumeOem.Ts_fujitsu.DriveCacheMode == plan.DriveCacheMode.ValueString() {
+		if volume.Name == plan.VolumeName.ValueString() {
+			//        &&
+			//			volumeOem.Ts_fujitsu.DriveCacheMode == plan.DriveCacheMode.ValueString() {
 			return true, nil
 		}
 
@@ -617,10 +682,14 @@ func updateStorageVolume(ctx context.Context, service *gofish.Service, state *mo
 	payload := map[string]map[string]map[string]string{
 		"Oem": {
 			"ts_fujitsu": {
-				"DriveCacheMode": plan.DriveCacheMode.ValueString(),
-				"Name":           plan.VolumeName.ValueString(), // R/W only over Oem section
+				//			"DriveCacheMode": plan.DriveCacheMode.ValueString(),
+				"Name": plan.VolumeName.ValueString(), // R/W only over Oem section
 			},
 		},
+	}
+
+	if !plan.DriveCacheMode.IsUnknown() {
+		payload["Oem"]["ts_fujitsu"]["DriveCacheMode"] = plan.DriveCacheMode.ValueString()
 	}
 
 	volume_endpoint := state.Id.ValueString()
@@ -663,10 +732,10 @@ func StorageVolumeSchema() map[string]schema.Attribute {
 				stringplanmodifier.UseStateForUnknown(),
 			},
 		},
-		"storage_controller_id": schema.StringAttribute{
+		"storage_controller_serial_number": schema.StringAttribute{
 			Required:            true,
-			Description:         "Id of storage controller.",
-			MarkdownDescription: "Id of storage controller.",
+			Description:         "Serial number of storage controller.",
+			MarkdownDescription: "Serial number of storage controller.",
 			PlanModifiers: []planmodifier.String{
 				stringplanmodifier.RequiresReplace(),
 			},
@@ -736,7 +805,6 @@ func StorageVolumeSchema() map[string]schema.Attribute {
 					"Normal",
 				}...),
 			},
-			Computed: true,
 			PlanModifiers: []planmodifier.String{
 				stringplanmodifier.RequiresReplaceIfConfigured(),
 			},
@@ -854,7 +922,7 @@ func (r *StorageVolumeResource) Create(ctx context.Context, req resource.CreateR
 
 	defer api.Logout()
 
-	storage_id := plan.StorageId.ValueString()
+	storage_id := plan.StorageControllerSN.ValueString()
 	volumes_ids_before, diags := getVolumesIdsList(api.Service, storage_id)
 	resp.Diagnostics.Append(diags...)
 	if diags.HasError() {
@@ -885,7 +953,6 @@ func (r *StorageVolumeResource) Create(ctx context.Context, req resource.CreateR
 	// Update state based on created volume details
 	volume, diags, to_remove := doesVolumeStillExist(api.Service, new_volume_endpoint)
 	if to_remove {
-		//        resp.Diagnostics.Append(diags...)
 		resp.State.RemoveResource(ctx)
 		return
 	}
@@ -903,7 +970,8 @@ func (r *StorageVolumeResource) Create(ctx context.Context, req resource.CreateR
 	}
 
 	var target_volume_state models.StorageVolumeResourceModel
-	diags = readStorageVolumeToState(volume, &target_volume_state)
+	diags = readStorageVolumeToState(volume, plan.StorageControllerSN.ValueString(),
+		&target_volume_state)
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
 		return
@@ -936,6 +1004,18 @@ func (r *StorageVolumeResource) Read(ctx context.Context, req resource.ReadReque
 
 	defer api.Logout()
 
+	validStorageEndpoint, err := getValidStorageEndpointFromSerial(api.Service, state.StorageControllerSN.ValueString())
+	if err != nil {
+		resp.Diagnostics.AddError("Failed to get valid storage id", err.Error())
+		return
+	}
+
+	if updateVolumeODataId(validStorageEndpoint, &state) {
+		tflog.Info(ctx, "resource-storage-volume: state controller changed its Id")
+	} else {
+		tflog.Info(ctx, "resource-storage-volume: storage controller has stable id")
+	}
+
 	volume, diags, to_remove := doesVolumeStillExist(api.Service, state.Id.ValueString())
 	if to_remove {
 		resp.State.RemoveResource(ctx)
@@ -954,7 +1034,7 @@ func (r *StorageVolumeResource) Read(ctx context.Context, req resource.ReadReque
 		return
 	}
 
-	diags = readStorageVolumeToState(volume, &state)
+	diags = readStorageVolumeToState(volume, state.StorageControllerSN.ValueString(), &state)
 	resp.Diagnostics.Append(diags...)
 
 	if diags.HasError() {
@@ -1020,7 +1100,7 @@ func (r *StorageVolumeResource) Update(ctx context.Context, req resource.UpdateR
 		return
 	}
 
-	diags = readStorageVolumeToState(volume, &state)
+	diags = readStorageVolumeToState(volume, state.StorageControllerSN.ValueString(), &state)
 	resp.Diagnostics.Append(diags...)
 	if diags.HasError() {
 		return
