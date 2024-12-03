@@ -104,45 +104,26 @@ func (r *StorageVolumeResource) updateStorageVolumeState(
 	return models.StorageVolumeResourceModel{
 		Id:                  types.StringValue(volume_endpoint),
 		StorageControllerSN: plan.StorageControllerSN,
+		RedfishServer:       plan.RedfishServer,
 
-		RaidType:           plan.RaidType,
-		VolumeName:         plan.VolumeName,
-		PhysicalDrives:     plan.PhysicalDrives,
-		OptimumIOSizeBytes: plan.OptimumIOSizeBytes,
-		InitMode:           plan.InitMode, // information not preserved in Redfish
+		PhysicalDrives: plan.PhysicalDrives, // easier to be obtained from plan than from volume
+		InitMode:       plan.InitMode,       // information not preserved in Redfish
 
-		CapacityBytes: target_volume_state.CapacityBytes,
+		OptimumIOSizeBytes: target_volume_state.OptimumIOSizeBytes,
+		RaidType:           target_volume_state.RaidType,
+		VolumeName:         target_volume_state.VolumeName,
+		CapacityBytes:      target_volume_state.CapacityBytes,
 
 		// Property marked as Computed are expected to return real values
 		ReadMode:       target_volume_state.ReadMode,
 		WriteMode:      target_volume_state.WriteMode,
 		DriveCacheMode: target_volume_state.DriveCacheMode,
-
-		RedfishServer: plan.RedfishServer,
 	}
 }
 
-func GetSystemStorageResource(service *gofish.Service, storage_id string) (*redfish.Storage, error) {
-	system, err := GetSystemResource(service)
-	if err != nil {
-		return nil, err
-	}
-
-	list_of_storage_controllers, err := system.Storage()
-	if err != nil {
-		return nil, err
-	}
-
-	for _, storage := range list_of_storage_controllers {
-		if storage.ID == storage_id {
-			return storage, nil
-		}
-	}
-
-	return nil, fmt.Errorf("Requested Storage resource has not been found on list")
-}
-
-func GetSystemStorageResourceFromSerial(service *gofish.Service, serial string) (*redfish.Storage, error) {
+// getSystemStorageFromSerialNumber returns pointer to storage resource
+// represented by requested serial number.
+func getSystemStorageFromSerialNumber(service *gofish.Service, serial string) (*redfish.Storage, error) {
 	system, err := GetSystemResource(service)
 	if err != nil {
 		return nil, err
@@ -190,7 +171,7 @@ func getSystemStorageOemRaidCapabilitiesResource(service *gofish.Service, endpoi
 }
 
 func getVolumesCollectionUrl(service *gofish.Service, serial string) (url string, err error) {
-	storage, err := GetSystemStorageResourceFromSerial(service, serial)
+	storage, err := getSystemStorageFromSerialNumber(service, serial)
 	if err != nil {
 		return "", fmt.Errorf("Storage resource could not be obtained %s", err.Error())
 	}
@@ -205,7 +186,7 @@ func validateRequestAgainstStorageControllerCapabilities(ctx context.Context, se
 	storage_id string, plan models.StorageVolumeResourceModel) ([]physical_disk_group, error) {
 	physical_disk_groups := []physical_disk_group{}
 
-	storage, err := GetSystemStorageResourceFromSerial(service, storage_id)
+	storage, err := getSystemStorageFromSerialNumber(service, storage_id)
 	if err != nil {
 		return physical_disk_groups, fmt.Errorf("Storage resource could not be obtained %s", err.Error())
 	}
@@ -427,7 +408,7 @@ func getNewVolumeConfigFromPlan(plan models.StorageVolumeResourceModel,
 // getVolumesIdsList access requested storage_id and returns slice of available volumes
 // by their @odata.id.
 func getVolumesIdsList(service *gofish.Service, storage_id string) (out []string, diags diag.Diagnostics) {
-	storage, err := GetSystemStorageResourceFromSerial(service, storage_id)
+	storage, err := getSystemStorageFromSerialNumber(service, storage_id)
 	if err != nil {
 		diags.AddError("Could not obtain storage controller with requested id", err.Error())
 		return
@@ -490,7 +471,7 @@ func requestVolumeCreationAndSuperviseCreation(ctx context.Context, service *gof
 // getValidStorageEndpointFromSerial returns storage which represents itself
 // with requested serial number.
 func getValidStorageEndpointFromSerial(service *gofish.Service, storage_serial string) (endpoint string, err error) {
-	storage, err := GetSystemStorageResourceFromSerial(service, storage_serial)
+	storage, err := getSystemStorageFromSerialNumber(service, storage_serial)
 	if err != nil {
 		return "", err
 	}
@@ -640,6 +621,21 @@ func readStorageVolumeToState(volume *redfish.Volume, storage_serial string,
 func compareVolumePropertiesWithPlan(ctx context.Context, service *gofish.Service, volume_id string,
 	plan *models.StorageVolumeResourceModel, timeout_s int64) (bool, error) {
 	start_time := time.Now().Unix()
+
+	nameVerified := true
+	verifyVolumeName := false
+	if !plan.VolumeName.IsUnknown() {
+		verifyVolumeName = true
+		nameVerified = false
+	}
+
+	driveCacheVerified := true
+	verifyDriveCacheMode := false
+	if !plan.DriveCacheMode.IsUnknown() {
+		verifyDriveCacheMode = true
+		driveCacheVerified = false
+	}
+
 	for {
 		volume, err := redfish.GetVolume(service.GetClient(), volume_id)
 		if err != nil {
@@ -652,10 +648,19 @@ func compareVolumePropertiesWithPlan(ctx context.Context, service *gofish.Servic
 			return false, err
 		}
 
-		// Verify if plan has been applied
-		if volume.Name == plan.VolumeName.ValueString() {
-			//        &&
-			//			volumeOem.Ts_fujitsu.DriveCacheMode == plan.DriveCacheMode.ValueString() {
+		if verifyVolumeName {
+			if volume.Name == plan.VolumeName.ValueString() {
+				nameVerified = true
+			}
+		}
+
+		if verifyDriveCacheMode {
+			if volumeOem.Ts_fujitsu.DriveCacheMode == plan.DriveCacheMode.ValueString() {
+				driveCacheVerified = true
+			}
+		}
+
+		if nameVerified && driveCacheVerified {
 			return true, nil
 		}
 
@@ -681,16 +686,21 @@ func updateStorageVolume(ctx context.Context, service *gofish.Service, state *mo
 	plan *models.StorageVolumeResourceModel) (diags diag.Diagnostics) {
 	payload := map[string]map[string]map[string]string{
 		"Oem": {
-			"ts_fujitsu": {
-				//			"DriveCacheMode": plan.DriveCacheMode.ValueString(),
-				"Name": plan.VolumeName.ValueString(), // R/W only over Oem section
-			},
+			"ts_fujitsu": {},
 		},
 	}
 
 	if !plan.DriveCacheMode.IsUnknown() {
 		payload["Oem"]["ts_fujitsu"]["DriveCacheMode"] = plan.DriveCacheMode.ValueString()
 	}
+
+	if !plan.VolumeName.IsUnknown() {
+		payload["Oem"]["ts_fujitsu"]["Name"] = plan.VolumeName.ValueString()
+	}
+
+	tflog.Info(ctx, "Volume change requested with payload", map[string]interface{}{
+		"requested_payload": fmt.Sprintf("%v", payload),
+	})
 
 	volume_endpoint := state.Id.ValueString()
 	res, err := service.GetClient().Patch(volume_endpoint, payload)
@@ -762,8 +772,8 @@ func StorageVolumeSchema() map[string]schema.Attribute {
 		},
 		"physical_drives": schema.ListAttribute{
 			Required:            true,
-			Description:         "Slot location of the disk",
-			MarkdownDescription: "Slot location of the disk",
+			Description:         "List of slot locations of disks used for volume creation.",
+			MarkdownDescription: "List of slot locations of disks used for volume creation.",
 			ElementType:         types.StringType,
 			Validators: []validator.List{
 				listvalidator.SizeAtLeast(1),
@@ -782,13 +792,13 @@ func StorageVolumeSchema() map[string]schema.Attribute {
 			Optional:            true,
 			Computed:            true,
 			PlanModifiers: []planmodifier.Int64{
-				int64planmodifier.RequiresReplace(),
+				int64planmodifier.RequiresReplaceIfConfigured(),
 			},
 		},
 		"name": schema.StringAttribute{
 			Optional:            true,
-			Description:         "Volume name",
-			MarkdownDescription: "Volume name",
+			Description:         "Volume name.",
+			MarkdownDescription: "Volume name.",
 			Validators: []validator.String{
 				stringvalidator.LengthAtLeast(1),
 				stringvalidator.LengthAtMost(15),
@@ -810,9 +820,9 @@ func StorageVolumeSchema() map[string]schema.Attribute {
 			},
 		},
 		"optimum_io_size_bytes": schema.Int64Attribute{
-			Description:         "Optimum IO size bytes",
-			MarkdownDescription: "Optimum IO size bytes",
-			Optional:            true,
+			Description:         "Optimum IO size bytes.",
+			MarkdownDescription: "Optimum IO size bytes.",
+			Required:            true,
 			PlanModifiers: []planmodifier.Int64{
 				int64planmodifier.RequiresReplace(),
 			},
@@ -861,9 +871,6 @@ func StorageVolumeSchema() map[string]schema.Attribute {
 				}...),
 			},
 			Computed: true,
-			PlanModifiers: []planmodifier.String{
-				stringplanmodifier.RequiresReplaceIfConfigured(),
-			},
 		},
 	}
 }

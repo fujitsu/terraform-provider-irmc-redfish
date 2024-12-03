@@ -1,26 +1,35 @@
 # irmc-redfish_storage_volume (Resource)
 
-This resource is used to manipulate (Create, Read, Delete, Update and Import) logical volumes of iRMC system
+This resource is used to manipulate (Create, Read, Delete, Update and Import) logical volumes of iRMC system.
+Please remember that every RAID controller might have its own specific behavior and allowed values for specific properties
+depending on BBU installation status, types of disks, RAID type etc.
+To facilitate process of volume creation for particular controller and situation it is recommended to
+
+RAID controller serial number can be obtained by reading property SerialNumber in resource:
+- /redfish/v1/Systems/0/Storage/<controllerId>
+
+Every RAID controller presents its capabilities (supported RAID types etc.) in the following resource:
+- /redfish/v1/Systems/0/Storage/<controllerId>/Oem/ts_fujitsu/RAIDCapabilities
 
 
 ## Schema
 
 ### Required
 
-- `physical_drives` (List of String) Slot location of the disk
-- `raid_type` (String) RAID volume type depending on controller itself
-- `storage_controller_id` (String) Id of storage controller.
+- `optimum_io_size_bytes` (Number) Optimum IO size bytes (65536. 131072, 262144, 524288, 1048576).
+- `physical_drives` (List of String) List of slot locations of disks used for volume creation.
+- `raid_type` (String) RAID volume type depending on controller itself (RAID0, RAID1, RAID1E, RAID10, RAID5, RAID50, RAID6, RAID60).
+- `storage_controller_serial_number` (String) Serial number of storage controller.
 
 ### Optional
 
 - `capacity_bytes` (Number) Volume capacity in bytes. If not specified during creation, volume will have maximum size calculated from chosen disks.
-- `drive_cache_mode` (String) Drive cache mode of volume.
-- `init_mode` (String) Initialize mode for new volume.
+- `drive_cache_mode` (String) Drive cache mode of volume (Enabled, Disabled, Unchanged).
+- `init_mode` (String) Initialize mode for new volume (None, Fast, Normal).
 - `name` (String) Volume name
-- `optimum_io_size_bytes` (Number) Optimum IO size bytes
-- `read_mode` (String) Read mode of volume.
+- `read_mode` (String) Read mode of volume (Adaptive, NoReadAhead, ReadAhead).
 - `server` (Block List) List of server BMCs and their respective user credentials (see [below for nested schema](#nestedblock--server))
-- `write_mode` (String) Write mode of volume.
+- `write_mode` (String) Write mode of volume (WriteBack, AlwaysWriteBack, WriteThrough).
 
 ### Read-Only
 
@@ -32,12 +41,12 @@ This resource is used to manipulate (Create, Read, Delete, Update and Import) lo
 Required:
 
 - `endpoint` (String) Server BMC IP address or hostname
-- `password` (String, Sensitive) User password for login
-- `username` (String) User name for login
 
 Optional:
 
+- `password` (String, Sensitive) User password for login
 - `ssl_insecure` (Boolean) This field indicates whether the SSL/TLS certificate must be verified or not
+- `username` (String) User name for login
 
 ## Import
 

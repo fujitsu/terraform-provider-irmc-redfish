@@ -25,7 +25,7 @@ resource "irmc-redfish_bios" "bio" {
   }
 
   attributes = {
-    "AssetTag" : "MyTag"
+    "AssetTag" : "MyTagAZZ"
     "BIOSParameterBackup" : "Enabled"
   }
   system_reset_type = "ForceRestart"
