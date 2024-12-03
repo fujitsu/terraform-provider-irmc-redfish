@@ -64,6 +64,7 @@ const (
 	STORAGE_COLLECTION_ENDPOINT     = "/redfish/v1/Systems/0/Storage"
 	STORAGE_RAIDCAPABILITIES_SUFFIX = "/Oem/ts_fujitsu/RAIDCapabilities"
 	HTTP_HEADER_LOCATION            = "Location"
+	STORAGE_VOLUME_RESOURCE_NAME    = "resource-storage_volume"
 )
 
 type raidCapabilitiesConfig struct {
@@ -917,9 +918,8 @@ func (r *StorageVolumeResource) Create(ctx context.Context, req resource.CreateR
 
 	// Provide synchronization
 	var endpoint string = plan.RedfishServer[0].Endpoint.ValueString()
-	var resource_name string = "resource-storage_volume"
-	mutexPool.Lock(ctx, endpoint, resource_name)
-	defer mutexPool.Unlock(ctx, endpoint, resource_name)
+	mutexPool.Lock(ctx, endpoint, STORAGE_VOLUME_RESOURCE_NAME)
+	defer mutexPool.Unlock(ctx, endpoint, STORAGE_VOLUME_RESOURCE_NAME)
 
 	api, err := ConnectTargetSystem(r.p, &plan.RedfishServer)
 	if err != nil {
@@ -1072,6 +1072,11 @@ func (r *StorageVolumeResource) Update(ctx context.Context, req resource.UpdateR
 		return
 	}
 
+	// Provide synchronization
+	var endpoint string = plan.RedfishServer[0].Endpoint.ValueString()
+	mutexPool.Lock(ctx, endpoint, STORAGE_VOLUME_RESOURCE_NAME)
+	defer mutexPool.Unlock(ctx, endpoint, STORAGE_VOLUME_RESOURCE_NAME)
+
 	// Connect to service
 	api, err := ConnectTargetSystem(r.p, &plan.RedfishServer)
 	if err != nil {
@@ -1129,6 +1134,11 @@ func (r *StorageVolumeResource) Delete(ctx context.Context, req resource.DeleteR
 	if resp.Diagnostics.HasError() {
 		return
 	}
+
+	// Provide synchronization
+	var endpoint string = state.RedfishServer[0].Endpoint.ValueString()
+	mutexPool.Lock(ctx, endpoint, STORAGE_VOLUME_RESOURCE_NAME)
+	defer mutexPool.Unlock(ctx, endpoint, STORAGE_VOLUME_RESOURCE_NAME)
 
 	// Connect to service
 	api, err := ConnectTargetSystem(r.p, &state.RedfishServer)
