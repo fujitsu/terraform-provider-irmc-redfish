@@ -211,7 +211,7 @@ func (r *BiosResource) Read(ctx context.Context, req resource.ReadRequest, resp 
 
 	defer api.Logout()
 
-	diags := readBiosAttributesSettingsToModel(ctx, api.Service, &state)
+	diags := readBiosAttributesSettingsToModel(ctx, api.Service, &state.Attributes, false)
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
 		return
@@ -438,7 +438,7 @@ func isAttributeSupported(key string) bool {
 }
 
 // readBiosAttributesSettingsToModel reads target bios settings from service into state attributes.
-func readBiosAttributesSettingsToModel(ctx context.Context, service *gofish.Service, state *models.BiosResourceModel) (diags diag.Diagnostics) {
+func readBiosAttributesSettingsToModel(ctx context.Context, service *gofish.Service, attrMap *types.Map, updateAll bool) (diags diag.Diagnostics) {
 	system, err := GetSystemResource(service)
 	if err != nil {
 		diags.AddError("Error while reading /Systems/0", err.Error())
@@ -463,16 +463,20 @@ func readBiosAttributesSettingsToModel(ctx context.Context, service *gofish.Serv
 	attributesIntoModel := make(map[string]attr.Value)
 
 	attributes := convertRedfishBiosAttributesToUnifiedFormat(rBios.Attributes)
-	configuredAttributes := state.Attributes.Elements()
+	configuredAttributes := attrMap.Elements()
 	for key, val := range attributes {
 		if isAttributeSupported(key) {
-			if _, ok := configuredAttributes[key]; ok {
-				// only these attributes are put into the state, which were previously configured by user
+			if updateAll {
 				attributesIntoModel[key] = types.StringValue(val)
+			} else {
+				if _, ok := configuredAttributes[key]; ok {
+					// only these attributes are put into the state, which were previously configured by user
+					attributesIntoModel[key] = types.StringValue(val)
+				}
 			}
 		}
 	}
 
-	state.Attributes, diags = types.MapValueFrom(ctx, types.StringType, attributesIntoModel)
+	*attrMap, diags = types.MapValueFrom(ctx, types.StringType, attributesIntoModel)
 	return diags
 }
