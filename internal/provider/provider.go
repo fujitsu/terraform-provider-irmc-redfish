@@ -125,6 +125,7 @@ func (p *IrmcProvider) Resources(ctx context.Context) []func() resource.Resource
 		NewBiosResource,
 		NewUserAccountResource,
 		NewSimpleUpdateResource,
+		NewStorageResource,
 	}
 }
 
