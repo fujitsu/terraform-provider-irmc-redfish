@@ -24,5 +24,5 @@ resource "irmc-redfish_storage" "storage" {
   }
 
   storage_controller_serial_number = "SKC4910421"
-  patrol_read = "Manual"
+  patrol_read                      = "Manual"
 }
