@@ -9,7 +9,7 @@ description: |-
 
 The resource is used to control (read, modify or import) storage controller settings on Fujitsu server equipped with iRMC controller.
 The resource operation is based on storage controller serial number which is unique per controller.
-Please remember that not all properties defined in this resource and their possible values will be acceptable in every controller
+Please remember that not all properties defined in this resource and their possible values will be acceptable for every controller
 and in every hardware configuration. Provider implementation applies only these properties to controller, which are requested in plan.
 
 
