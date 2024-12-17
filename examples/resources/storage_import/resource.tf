@@ -15,11 +15,14 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-rack1 = {
-  "batman" = {
+resource "irmc-redfish_storage" "storage" {
+  server {
     username     = "admin"
     password     = "adminADMIN123"
-    endpoint     = "https://10.172.201.240"
+    endpoint     = "https://10.172.201.40"
     ssl_insecure = true
-  },
+  }
+
+  storage_controller_serial_number = "SKC4910421"
+  patrol_read = "Manual"
 }

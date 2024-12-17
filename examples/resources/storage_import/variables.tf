@@ -15,11 +15,11 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-rack1 = {
-  "batman" = {
-    username     = "admin"
-    password     = "adminADMIN123"
-    endpoint     = "https://10.172.201.240"
-    ssl_insecure = true
-  },
+variable "rack1" {
+  type = map(object({
+    username     = string
+    password     = string
+    endpoint     = string
+    ssl_insecure = bool
+  }))
 }

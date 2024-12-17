@@ -16,10 +16,10 @@ limitations under the License.
 */
 
 rack1 = {
-  "batman" = {
+  "dante" = {
     username     = "admin"
-    password     = "adminADMIN123"
-    endpoint     = "https://10.172.201.240"
+    password     = "admin"
+    endpoint     = "https://10.172.201.188"
     ssl_insecure = true
-  },
+  }
 }

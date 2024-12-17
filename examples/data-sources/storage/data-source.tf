@@ -15,11 +15,19 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-rack1 = {
-  "batman" = {
-    username     = "admin"
-    password     = "adminADMIN123"
-    endpoint     = "https://10.172.201.240"
-    ssl_insecure = true
-  },
+data "irmc-redfish_storage" "sto" {
+  for_each = var.rack1
+  server {
+    username     = each.value.username
+    password     = each.value.password
+    endpoint     = each.value.endpoint
+    ssl_insecure = each.value.ssl_insecure
+  }
+
+  storage_controller_serial_number = "SKC49104211"
+}
+
+output "storage" {
+  value     = data.irmc-redfish_storage.sto
+  sensitive = true
 }

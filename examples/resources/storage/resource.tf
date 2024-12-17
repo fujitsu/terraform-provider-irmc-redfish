@@ -24,14 +24,15 @@ resource "irmc-redfish_storage" "storage" {
     ssl_insecure = each.value.ssl_insecure
   }
 
-  job_timeout = 180
-  storage_controller_serial_number = "SKC4910421"
-  bios_continue_on_error = "PauseOnErrors"
-  bios_status = true
-  patrol_read = "Manual"
-  patrol_read_rate = 32
-  bgi_rate = 31
-  mdc_rate = 32
-  rebuild_rate = 32
-  migration_rate = 35
+  job_timeout                      = 120
+  storage_controller_serial_number = "SPC4771567"
+  bios_continue_on_error           = "StopOnErrors"
+  #bios_status                      = false
+  #  patrol_read                      = "Manual"
+  patrol_read_rate                 = 0
+  bgi_rate = 100
+  #  mdc_rate                         = 32
+  #  rebuild_rate                     = 32
+  migration_rate                   = 36
+  auto_rebuild_enabled = false
 }

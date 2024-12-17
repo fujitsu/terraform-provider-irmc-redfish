@@ -134,6 +134,7 @@ func (p *IrmcProvider) DataSources(ctx context.Context) []func() datasource.Data
 		NewVirtualMediaDataSource,
 		NewBiosDataSource,
 		NewFirmwareInventoryDataSource,
+		NewStorageDataSource,
 	}
 }
 
