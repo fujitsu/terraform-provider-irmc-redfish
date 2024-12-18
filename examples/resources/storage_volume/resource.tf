@@ -13,13 +13,17 @@ resource "irmc-redfish_storage_volume" "volume" {
   // Optional, if not defined maximum capacity for given RAID raid_type
   // and used physical_drives will be choosen
   capacity_bytes = 100000000000
-  name           = "new-volume2"
+  name           = "new-volume"
 
   init_mode             = "Fast"
   optimum_io_size_bytes = 65536
-  read_mode             = "ReadAhead"
-  write_mode            = "AlwaysWriteBack"
-  drive_cache_mode      = "Enabled"
+  read_mode = {
+    requested = "ReadAhead"
+  }
+  write_mode = {
+    requested = "WriteBack"
+  }
+  drive_cache_mode = "Enabled"
 
   physical_drives = ["[\"6\", \"7\"]"]
 }

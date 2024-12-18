@@ -26,14 +26,27 @@ Every RAID controller presents its capabilities (supported RAID types etc.) in t
 - `capacity_bytes` (Number) Volume capacity in bytes. If not specified during creation, volume will have maximum size calculated from chosen disks.
 - `drive_cache_mode` (String) Drive cache mode of volume (Enabled, Disabled, Unchanged).
 - `init_mode` (String) Initialize mode for new volume (None, Fast, Normal).
+- `job_timeout` (Number) Job timeout in seconds.
 - `name` (String) Volume name
-- `read_mode` (String) Read mode of volume (Adaptive, NoReadAhead, ReadAhead).
+- `read_mode` (Attributes) (see [below for nested schema](#nestedatt--read_mode))
 - `server` (Block List) List of server BMCs and their respective user credentials (see [below for nested schema](#nestedblock--server))
-- `write_mode` (String) Write mode of volume (WriteBack, AlwaysWriteBack, WriteThrough).
+- `write_mode` (Attributes) (see [below for nested schema](#nestedatt--write_mode))
 
 ### Read-Only
 
 - `id` (String) Id of handled volume
+
+<a id="nestedatt--read_mode"></a>
+### Nested Schema for `read_mode`
+
+Optional:
+
+- `requested` (String) Requested read mode of a created volume (Adaptive, NoReadAhead, ReadAhead).
+
+Read-Only:
+
+- `actual` (String) Actual read mode of a created volume.
+
 
 <a id="nestedblock--server"></a>
 ### Nested Schema for `server`
@@ -47,6 +60,18 @@ Optional:
 - `password` (String, Sensitive) User password for login
 - `ssl_insecure` (Boolean) This field indicates whether the SSL/TLS certificate must be verified or not
 - `username` (String) User name for login
+
+<a id="nestedatt--write_mode"></a>
+### Nested Schema for `write_mode`
+
+Optional:
+
+- `requested` (String) Requested Write mode of a created volume (WriteBack, AlwaysWriteBack, WriteThrough).
+
+Read-Only:
+
+- `actual` (String) Actual Write mode of a created volume.
+
 
 ## Import
 

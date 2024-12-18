@@ -40,4 +40,7 @@ The provider is released and licensed under the MPL-2.0 license. See [License](L
 * [Boot source override](docs/resources/boot_source_override.md)
 * [iRMC reset](docs/resources/irmc_reset.md)
 * [Power](docs/resources/power.md)
+* [Simple update](docs/resources/simple_update.md)
+* [Storage volume](docs/resources/storage_volume.md)
+* [User account](docs/resources/user_account.md)
 * [Virtual media](docs/resources/virtual_media.md)
