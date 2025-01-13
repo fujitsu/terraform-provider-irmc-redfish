@@ -300,16 +300,16 @@ func verifyRequestedDisks(ctx context.Context, plan models.StorageVolumeResource
 				if enclosure_attached {
 					if fmt.Sprintf("%d-%d", enclosure, slot) == disk {
 						disk_found = true
+						drives_media_type = drive.MediaType
 						break
 					}
 				} else {
 					if strconv.Itoa(slot) == disk {
 						disk_found = true
+						drives_media_type = drive.MediaType
 						break
 					}
 				}
-
-				drives_media_type = drive.MediaType
 			}
 
 			if !disk_found {
