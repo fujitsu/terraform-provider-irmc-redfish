@@ -3,7 +3,7 @@
 This resource is used to manipulate (Create, Read, Delete, Update and Import) logical volumes of iRMC system.
 Please remember that every RAID controller might have its own specific behavior and allowed values for specific properties
 depending on BBU installation status, types of disks, RAID type etc.
-To facilitate process of volume creation for particular controller and situation it is recommended to
+To facilitate process of volume creation for particular controller and situation it is recommended to check the following entries.
 
 RAID controller serial number can be obtained by reading property SerialNumber in resource:
 - /redfish/v1/Systems/0/Storage/<controllerId>
