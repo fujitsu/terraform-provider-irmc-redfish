@@ -98,8 +98,8 @@ func (v CapacityByteValue) Type(ctx context.Context) attr.Type {
 }
 
 type StorageVolumeDynamicParam struct {
-    Requested types.String `tfsdk:"requested"`
-    Actual types.String `tfsdk:"actual"`
+	Requested types.String `tfsdk:"requested"`
+	Actual    types.String `tfsdk:"actual"`
 }
 
 // StorageVolumeResourceModel describes the resource data model.
@@ -107,15 +107,15 @@ type StorageVolumeResourceModel struct {
 	Id                  types.String    `tfsdk:"id"`
 	StorageControllerSN types.String    `tfsdk:"storage_controller_serial_number"`
 	RedfishServer       []RedfishServer `tfsdk:"server"`
-    JobTimeout    types.Int64     `tfsdk:"job_timeout"`
+	JobTimeout          types.Int64     `tfsdk:"job_timeout"`
 
-	RaidType           types.String      `tfsdk:"raid_type"`
-	CapacityBytes      CapacityByteValue `tfsdk:"capacity_bytes"`
-	VolumeName         types.String      `tfsdk:"name"`
-	InitMode           types.String      `tfsdk:"init_mode"`
-	PhysicalDrives     types.List        `tfsdk:"physical_drives"`
-	OptimumIOSizeBytes types.Int64       `tfsdk:"optimum_io_size_bytes"`
-	ReadMode           StorageVolumeDynamicParam      `tfsdk:"read_mode"`
-	WriteMode          StorageVolumeDynamicParam      `tfsdk:"write_mode"`
-	DriveCacheMode     types.String      `tfsdk:"drive_cache_mode"`
+	RaidType           types.String               `tfsdk:"raid_type"`
+	CapacityBytes      CapacityByteValue          `tfsdk:"capacity_bytes"`
+	VolumeName         types.String               `tfsdk:"name"`
+	InitMode           types.String               `tfsdk:"init_mode"`
+	PhysicalDrives     types.List                 `tfsdk:"physical_drives"`
+	OptimumIOSizeBytes types.Int64                `tfsdk:"optimum_io_size_bytes"`
+	ReadMode           *StorageVolumeDynamicParam `tfsdk:"read_mode"`
+	WriteMode          *StorageVolumeDynamicParam `tfsdk:"write_mode"`
+	DriveCacheMode     types.String               `tfsdk:"drive_cache_mode"`
 }

@@ -29,7 +29,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
-    "github.com/hashicorp/terraform-plugin-framework/resource/schema/int64default"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/int64default"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/int64planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/listplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
@@ -52,11 +52,11 @@ type StorageVolumeResource struct {
 }
 
 const (
-	STORAGE_COLLECTION_ENDPOINT     = "/redfish/v1/Systems/0/Storage"
-	STORAGE_RAIDCAPABILITIES_SUFFIX = "/Oem/ts_fujitsu/RAIDCapabilities"
-	HTTP_HEADER_LOCATION            = "Location"
-	STORAGE_VOLUME_RESOURCE_NAME    = "resource-storage_volume"
-    STORAGE_VOLUME_JOB_DEFAULT_TIMEOUT = 300
+	STORAGE_COLLECTION_ENDPOINT        = "/redfish/v1/Systems/0/Storage"
+	STORAGE_RAIDCAPABILITIES_SUFFIX    = "/Oem/ts_fujitsu/RAIDCapabilities"
+	HTTP_HEADER_LOCATION               = "Location"
+	STORAGE_VOLUME_RESOURCE_NAME       = "resource-storage_volume"
+	STORAGE_VOLUME_JOB_DEFAULT_TIMEOUT = 300
 )
 
 func (r *StorageVolumeResource) Metadata(ctx context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
@@ -134,6 +134,7 @@ func StorageVolumeSchema() map[string]schema.Attribute {
 			},
 		},
 		"name": schema.StringAttribute{
+			Computed:            true,
 			Optional:            true,
 			Description:         "Volume name.",
 			MarkdownDescription: "Volume name.",
@@ -165,56 +166,56 @@ func StorageVolumeSchema() map[string]schema.Attribute {
 				int64planmodifier.RequiresReplace(),
 			},
 		},
-        "read_mode": schema.SingleNestedAttribute{
-            Attributes: map[string]schema.Attribute{
-                "requested": schema.StringAttribute{
-			        Optional: true,
-                    Description:         "Requested read mode of a created volume.",
-                    MarkdownDescription: "Requested read mode of a created volume.",
-                    Validators: []validator.String{
-                        stringvalidator.OneOf([]string{
-                            "Adaptive",
-                            "NoReadAhead",
-                            "ReadAhead",
-                        }...),
-                    },
-                    PlanModifiers: []planmodifier.String{
-                        stringplanmodifier.RequiresReplaceIfConfigured(),
-                    },
-                },
-                "actual": schema.StringAttribute{
-			        Computed: true,
-                    Description:         "Actual read mode of a created volume.",
-                    MarkdownDescription: "Actual read mode of a created volume.",
-                },
-            },
-            Optional: true,
-        },
-        "write_mode": schema.SingleNestedAttribute{
-            Attributes: map[string]schema.Attribute{
-                "requested": schema.StringAttribute{
-			        Optional: true,
-                    Description:         "Requested write mode of a created volume.",
-                    MarkdownDescription: "Requested Write mode of a created volume.",
-                    Validators: []validator.String{
-                        stringvalidator.OneOf([]string{
-                            "WriteBack",
-                            "AlwaysWriteBack",
-                            "WriteThrough",
-                        }...),
-                    },
-                    PlanModifiers: []planmodifier.String{
-                        stringplanmodifier.RequiresReplaceIfConfigured(),
-                    },
-                },
-                "actual": schema.StringAttribute{
-			        Computed: true,
-                    Description:         "Actual write mode of a created volume.",
-                    MarkdownDescription: "Actual Write mode of a created volume.",
-                },
-            },
-            Optional: true,
-        },
+		"read_mode": schema.SingleNestedAttribute{
+			Attributes: map[string]schema.Attribute{
+				"requested": schema.StringAttribute{
+					Optional:            true,
+					Description:         "Requested read mode of a created volume.",
+					MarkdownDescription: "Requested read mode of a created volume.",
+					Validators: []validator.String{
+						stringvalidator.OneOf([]string{
+							"Adaptive",
+							"NoReadAhead",
+							"ReadAhead",
+						}...),
+					},
+					PlanModifiers: []planmodifier.String{
+						stringplanmodifier.RequiresReplaceIfConfigured(),
+					},
+				},
+				"actual": schema.StringAttribute{
+					Computed:            true,
+					Description:         "Actual read mode of a created volume.",
+					MarkdownDescription: "Actual read mode of a created volume.",
+				},
+			},
+			Optional: true,
+		},
+		"write_mode": schema.SingleNestedAttribute{
+			Attributes: map[string]schema.Attribute{
+				"requested": schema.StringAttribute{
+					Optional:            true,
+					Description:         "Requested write mode of a created volume.",
+					MarkdownDescription: "Requested Write mode of a created volume.",
+					Validators: []validator.String{
+						stringvalidator.OneOf([]string{
+							"WriteBack",
+							"AlwaysWriteBack",
+							"WriteThrough",
+						}...),
+					},
+					PlanModifiers: []planmodifier.String{
+						stringplanmodifier.RequiresReplaceIfConfigured(),
+					},
+				},
+				"actual": schema.StringAttribute{
+					Computed:            true,
+					Description:         "Actual write mode of a created volume.",
+					MarkdownDescription: "Actual Write mode of a created volume.",
+				},
+			},
+			Optional: true,
+		},
 		"drive_cache_mode": schema.StringAttribute{
 			Optional:            true,
 			Description:         "Drive cache mode of volume.",
@@ -285,7 +286,7 @@ func (r *StorageVolumeResource) Create(ctx context.Context, req resource.CreateR
 	defer api.Logout()
 
 	var state models.StorageVolumeResourceModel
-    beRemoved, diags := createStorageVolume(ctx, api.Service, plan, &state)
+	beRemoved, diags := createStorageVolume(ctx, api.Service, plan, &state)
 	if beRemoved {
 		resp.State.RemoveResource(ctx)
 		return
@@ -334,12 +335,7 @@ func (r *StorageVolumeResource) Read(ctx context.Context, req resource.ReadReque
 		tflog.Info(ctx, "resource-storage-volume: storage controller has stable id")
 	}
 
-	volume, diags, to_remove := doesVolumeStillExist(api.Service, state.Id.ValueString())
-	if to_remove {
-		resp.State.RemoveResource(ctx)
-		return
-	}
-
+	volume, diags, _ := doesVolumeStillExist(api.Service, state.Id.ValueString())
 	if volume == nil {
 		resp.Diagnostics.Append(diags...)
 		if diags.HasError() {
@@ -397,16 +393,16 @@ func (r *StorageVolumeResource) Update(ctx context.Context, req resource.UpdateR
 
 	defer api.Logout()
 
-    beRemoved, diags := updateStorageVolume(ctx, api.Service, plan, &state)
+	beRemoved, diags := updateStorageVolume(ctx, api.Service, plan, &state)
 	if beRemoved {
 		resp.State.RemoveResource(ctx)
 		return
 	}
 
 	resp.Diagnostics.Append(diags...)
-    if diags.HasError() {
-        return
-    }
+	if diags.HasError() {
+		return
+	}
 
 	diags = resp.State.Set(ctx, &state)
 	resp.Diagnostics.Append(diags...)

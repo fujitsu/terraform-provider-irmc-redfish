@@ -19,9 +19,9 @@ package provider
 
 import (
 	"fmt"
+	"os"
 	"regexp"
 	"testing"
-    "os"
 
 	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
 )

@@ -16,21 +16,20 @@ limitations under the License.
 */
 
 package provider
-	
 
 import (
 	"context"
 	"encoding/json"
+	"errors"
+	"fmt"
 	"io"
 	"net/http"
 	"strconv"
 	"strings"
 	"time"
-    "fmt"
-    "errors"
-    
-    "terraform-provider-irmc-redfish/internal/models"
-   
+
+	"terraform-provider-irmc-redfish/internal/models"
+
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/hashicorp/terraform-plugin-log/tflog"
@@ -43,6 +42,9 @@ type raidCapabilitiesConfig struct {
 	RaidLevelCap []struct {
 		RaidType                string   `json:"RAIDType"`
 		StripeSizes             []int    `json:"StripeSizes"`
+		StripeSizesHDD          []int    `json:"StripeSizesHDD"`
+		StripeSizesSSD          []int    `json:"StripeSizesSSD"`
+		StripeSizesNVMe         []int    `json:"StripeSizesNVMe"`
 		MinimumDriveCount       int      `json:"MinimumDriveCount"`
 		MaximumDriveCount       int      `json:"MaximumDriveCount"`
 		MinimumSpanCount        int      `json:"MinimumSpanCount"`
@@ -67,36 +69,6 @@ type volumeOemObject struct {
 
 type physical_disk_group struct {
 	Group []string
-}
-
-func (r *StorageVolumeResource) updateStorageVolumeState(
-	plan models.StorageVolumeResourceModel,
-	target_volume_state models.StorageVolumeResourceModel,
-	volume_endpoint string) models.StorageVolumeResourceModel {
-
-	return models.StorageVolumeResourceModel{
-		Id:                  types.StringValue(volume_endpoint),
-		StorageControllerSN: plan.StorageControllerSN,
-		RedfishServer:       plan.RedfishServer,
-
-		PhysicalDrives: plan.PhysicalDrives, // easier to be obtained from plan than from volume
-		InitMode:       plan.InitMode,       // information not preserved in Redfish
-
-		OptimumIOSizeBytes: target_volume_state.OptimumIOSizeBytes,
-		RaidType:           target_volume_state.RaidType,
-		VolumeName:         target_volume_state.VolumeName,
-		CapacityBytes:      target_volume_state.CapacityBytes,
-
-		ReadMode:      models.StorageVolumeDynamicParam{
-            Requested: plan.ReadMode.Requested,
-            Actual: target_volume_state.ReadMode.Actual,
-        },
-		WriteMode:      models.StorageVolumeDynamicParam{
-            Requested: plan.WriteMode.Requested,
-            Actual: target_volume_state.WriteMode.Actual,
-        },
-		DriveCacheMode: target_volume_state.DriveCacheMode,
-	}
 }
 
 // getSystemStorageFromSerialNumber returns pointer to storage resource
@@ -169,7 +141,7 @@ func validateRequestAgainstStorageControllerCapabilities(ctx context.Context, se
 		return physical_disk_groups, fmt.Errorf("Storage resource could not be obtained %s", err.Error())
 	}
 
-	physical_disk_groups, err = verifyRequestedDisks(ctx, plan, storage)
+	physical_disk_groups, drives_media_type, err := verifyRequestedDisks(ctx, plan, storage)
 	if err != nil {
 		return physical_disk_groups, fmt.Errorf("Storage disk verification failed %s", err.Error())
 	}
@@ -190,10 +162,28 @@ func validateRequestAgainstStorageControllerCapabilities(ctx context.Context, se
 		if val.RaidType == plan.RaidType.ValueString() {
 			validated_raid_type = true
 
-			for _, supp_iosize := range val.StripeSizes {
-				if supp_iosize == int(plan.OptimumIOSizeBytes.ValueInt64()) {
-					validated_optimum_io_size_bytes = true
-					break
+			if len(val.StripeSizes) > 0 {
+				for _, supp_iosize := range val.StripeSizes {
+					if supp_iosize == int(plan.OptimumIOSizeBytes.ValueInt64()) {
+						validated_optimum_io_size_bytes = true
+						break
+					}
+				}
+			} else {
+				if drives_media_type == "SSD" {
+					for _, supp_iosize := range val.StripeSizesSSD {
+						if supp_iosize == int(plan.OptimumIOSizeBytes.ValueInt64()) {
+							validated_optimum_io_size_bytes = true
+							break
+						}
+					}
+				} else if drives_media_type == "HDD" {
+					for _, supp_iosize := range val.StripeSizesHDD {
+						if supp_iosize == int(plan.OptimumIOSizeBytes.ValueInt64()) {
+							validated_optimum_io_size_bytes = true
+							break
+						}
+					}
 				}
 			}
 
@@ -241,8 +231,9 @@ func validateRequestAgainstStorageControllerCapabilities(ctx context.Context, se
 // verifyRequestedDisks verifies requested plan around disks vs disks attached to
 // requested storage controller and returns slice of physical_disk_group if all disks
 // have been found on target.
-func verifyRequestedDisks(ctx context.Context, plan models.StorageVolumeResourceModel, storage *redfish.Storage) ([]physical_disk_group, error) {
+func verifyRequestedDisks(ctx context.Context, plan models.StorageVolumeResourceModel, storage *redfish.Storage) ([]physical_disk_group, redfish.MediaType, error) {
 	var plan_physical_disks []string
+	var drives_media_type redfish.MediaType
 	plan.PhysicalDrives.ElementsAs(ctx, &plan_physical_disks, true)
 
 	tflog.Info(ctx, "Details of PhysicalDrives", map[string]interface{}{
@@ -253,7 +244,7 @@ func verifyRequestedDisks(ctx context.Context, plan models.StorageVolumeResource
 
 	drives, err := storage.Drives()
 	if err != nil {
-		return physical_disks, fmt.Errorf("Could not read drives from target system %s", err.Error())
+		return physical_disks, drives_media_type, fmt.Errorf("Could not read drives from target system %s", err.Error())
 	}
 
 	for _, group := range plan_physical_disks {
@@ -266,7 +257,7 @@ func verifyRequestedDisks(ctx context.Context, plan models.StorageVolumeResource
 		var disks_in_group []string
 		err = json.Unmarshal([]byte(group), &disks_in_group)
 		if err != nil {
-			return physical_disks, fmt.Errorf("Could not unmarshal requested Drives '%s'", err.Error())
+			return physical_disks, drives_media_type, fmt.Errorf("Could not unmarshal requested Drives '%s'", err.Error())
 		}
 
 		for _, disk := range disks_in_group {
@@ -317,6 +308,8 @@ func verifyRequestedDisks(ctx context.Context, plan models.StorageVolumeResource
 						break
 					}
 				}
+
+				drives_media_type = drive.MediaType
 			}
 
 			if !disk_found {
@@ -333,7 +326,7 @@ func verifyRequestedDisks(ctx context.Context, plan models.StorageVolumeResource
 		physical_disks = append(physical_disks, physical_disk_group{Group: disks_in_group})
 	}
 
-	return physical_disks, nil
+	return physical_disks, drives_media_type, nil
 }
 
 // getNewVolumeConfigFromPlan based on plan and already converted list of disks in physical_disks
@@ -360,14 +353,18 @@ func getNewVolumeConfigFromPlan(plan models.StorageVolumeResourceModel,
 		volume_config["InitMode"] = init_mode
 	}
 
-	read_mode := plan.ReadMode.Requested.ValueString()
-	if len(read_mode) > 0 {
-		volume_config["ReadMode"] = read_mode
+	if plan.ReadMode != nil {
+		read_mode := plan.ReadMode.Requested.ValueString()
+		if len(read_mode) > 0 {
+			volume_config["ReadMode"] = read_mode
+		}
 	}
 
-	write_mode := plan.WriteMode.Requested.ValueString()
-	if len(write_mode) > 0 {
-		volume_config["WriteMode"] = write_mode
+	if plan.WriteMode != nil {
+		write_mode := plan.WriteMode.Requested.ValueString()
+		if len(write_mode) > 0 {
+			volume_config["WriteMode"] = write_mode
+		}
 	}
 
 	drive_cache_mode := plan.DriveCacheMode.ValueString()
@@ -497,7 +494,7 @@ func requestAndSuperviseVolumeCreationProcess(ctx context.Context, service *gofi
 	})
 
 	return requestVolumeCreationAndSuperviseTheProcess(ctx, service, volumes_collection_endpoint, new_volume_payload,
-        plan.JobTimeout.ValueInt64())
+		plan.JobTimeout.ValueInt64())
 }
 
 // deleteStorageVolume tries to destroy volume_endpoint in service.
@@ -586,8 +583,13 @@ func readStorageVolumeToState(volume *redfish.Volume, storage_serial string,
 		return diags
 	}
 
-	state.ReadMode.Actual = types.StringValue(volumeOem.Ts_fujitsu.ReadMode)
-	state.WriteMode.Actual = types.StringValue(volumeOem.Ts_fujitsu.WriteMode)
+	if state.ReadMode != nil {
+		state.ReadMode.Actual = types.StringValue(volumeOem.Ts_fujitsu.ReadMode)
+	}
+
+	if state.WriteMode != nil {
+		state.WriteMode.Actual = types.StringValue(volumeOem.Ts_fujitsu.WriteMode)
+	}
 	state.DriveCacheMode = types.StringValue(volumeOem.Ts_fujitsu.DriveCacheMode)
 
 	return diags
@@ -707,11 +709,10 @@ func requestVolumeModificationAndSuperviseTheProcess(ctx context.Context, servic
 	return diags
 }
 
-
 func updateStorageVolumeState(plan models.StorageVolumeResourceModel, target_volume_state models.StorageVolumeResourceModel,
-    volume_endpoint string) models.StorageVolumeResourceModel {
+	volume_endpoint string) models.StorageVolumeResourceModel {
 
-	return models.StorageVolumeResourceModel{
+	output := models.StorageVolumeResourceModel{
 		Id:                  types.StringValue(volume_endpoint),
 		StorageControllerSN: plan.StorageControllerSN,
 		RedfishServer:       plan.RedfishServer,
@@ -723,38 +724,45 @@ func updateStorageVolumeState(plan models.StorageVolumeResourceModel, target_vol
 		RaidType:           target_volume_state.RaidType,
 		VolumeName:         target_volume_state.VolumeName,
 		CapacityBytes:      target_volume_state.CapacityBytes,
-
-		ReadMode:      models.StorageVolumeDynamicParam{
-            Requested: plan.ReadMode.Requested,
-            Actual: target_volume_state.ReadMode.Actual,
-        },
-		WriteMode:      models.StorageVolumeDynamicParam{
-            Requested: plan.WriteMode.Requested,
-            Actual: target_volume_state.WriteMode.Actual,
-        },
-		DriveCacheMode: target_volume_state.DriveCacheMode,
-        JobTimeout: target_volume_state.JobTimeout,
+		DriveCacheMode:     target_volume_state.DriveCacheMode,
+		JobTimeout:         target_volume_state.JobTimeout,
 	}
+
+	if plan.ReadMode != nil {
+		output.ReadMode = &models.StorageVolumeDynamicParam{
+			Requested: target_volume_state.ReadMode.Requested,
+			Actual:    target_volume_state.ReadMode.Actual,
+		}
+	}
+
+	if plan.WriteMode != nil {
+		output.WriteMode = &models.StorageVolumeDynamicParam{
+			Requested: target_volume_state.WriteMode.Requested,
+			Actual:    target_volume_state.WriteMode.Actual,
+		}
+	}
+
+	return output
 }
 
 func createStorageVolume(ctx context.Context, service *gofish.Service, plan models.StorageVolumeResourceModel, state *models.StorageVolumeResourceModel) (removeResource bool, diags diag.Diagnostics) {
 	storage_id := plan.StorageControllerSN.ValueString()
 	volumes_ids_before, diags := getVolumesIdsList(service, storage_id)
-    if diags.HasError() {
-        return false, diags
-    }
+	if diags.HasError() {
+		return false, diags
+	}
 
 	diags = requestAndSuperviseVolumeCreationProcess(ctx, service, plan)
-    if diags.HasError() {
-        return false, diags
-    }
+	if diags.HasError() {
+		return false, diags
+	}
 
 	volumes_ids_after, diags := getVolumesIdsList(service, storage_id)
-    if diags.HasError() {
-        return false, diags
-    }
-	
-    new_volume_endpoint := getRecentlyCreatedVolumeId(
+	if diags.HasError() {
+		return false, diags
+	}
+
+	new_volume_endpoint := getRecentlyCreatedVolumeId(
 		volumes_ids_after, volumes_ids_before)
 
 	tflog.Trace(ctx, "Information about volume request", map[string]interface{}{
@@ -780,40 +788,51 @@ func createStorageVolume(ctx context.Context, service *gofish.Service, plan mode
 	}
 
 	var target_volume_state models.StorageVolumeResourceModel
+	target_volume_state.ReadMode = &models.StorageVolumeDynamicParam{}
+	target_volume_state.WriteMode = &models.StorageVolumeDynamicParam{}
+	if plan.ReadMode != nil {
+		target_volume_state.ReadMode.Requested = plan.ReadMode.Requested
+	}
+	if plan.WriteMode != nil {
+		target_volume_state.WriteMode.Requested = plan.WriteMode.Requested
+	}
+
 	diags = readStorageVolumeToState(volume, plan.StorageControllerSN.ValueString(),
 		&target_volume_state)
 
-    target_volume_state.WriteMode.Requested = plan.WriteMode.Requested
+	target_volume_state.JobTimeout = types.Int64Value(STORAGE_VOLUME_JOB_DEFAULT_TIMEOUT)
+	if !plan.JobTimeout.IsUnknown() {
+		target_volume_state.JobTimeout = plan.JobTimeout
+	}
 
-    target_volume_state.JobTimeout = types.Int64Value(STORAGE_VOLUME_JOB_DEFAULT_TIMEOUT)
-    if !plan.JobTimeout.IsUnknown() {
-        target_volume_state.JobTimeout = plan.JobTimeout
-    }
-
-    localState := updateStorageVolumeState(plan, target_volume_state, new_volume_endpoint)
-    *state = localState
-    return false, diags
+	localState := updateStorageVolumeState(plan, target_volume_state, new_volume_endpoint)
+	*state = localState
+	return false, diags
 }
 
 func updateStorageVolume(ctx context.Context, service *gofish.Service, plan models.StorageVolumeResourceModel, state *models.StorageVolumeResourceModel) (removeResource bool, diags diag.Diagnostics) {
-    diags = requestVolumeModificationAndSuperviseTheProcess(ctx, service, *state, plan)
+	diags = requestVolumeModificationAndSuperviseTheProcess(ctx, service, *state, plan)
+	if diags.HasError() {
+		return false, diags
+	}
+
 	tflog.Info(ctx, "resource-storage-volume: after update resource")
-	
-    volume, diags, beRemoved := doesVolumeStillExist(service, state.Id.ValueString())
+
+	volume, diags, beRemoved := doesVolumeStillExist(service, state.Id.ValueString())
 	if beRemoved {
 		return true, diags
 	}
-	
-    if volume == nil {
+
+	if volume == nil {
 		if diags.HasError() {
 			return false, diags
 		}
 	}
-	
-    diags = readStorageVolumeToState(volume, state.StorageControllerSN.ValueString(), state)
+
+	diags = readStorageVolumeToState(volume, state.StorageControllerSN.ValueString(), state)
 	if diags.HasError() {
-		return
+		return false, diags
 	}
-    
-    return false, diags
+
+	return false, diags
 }
