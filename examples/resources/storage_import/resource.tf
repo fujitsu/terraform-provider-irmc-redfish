@@ -15,21 +15,14 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package models
+resource "irmc-redfish_storage" "storage" {
+  server {
+    username     = "admin"
+    password     = "adminADMIN123"
+    endpoint     = "https://10.172.201.40"
+    ssl_insecure = true
+  }
 
-import (
-	"github.com/hashicorp/terraform-plugin-framework/types"
-)
-
-type BiosResourceModel struct {
-	Id              types.String    `tfsdk:"id"`
-	RedfishServer   []RedfishServer `tfsdk:"server"`
-	Attributes      types.Map       `tfsdk:"attributes"`
-	SystemResetType types.String    `tfsdk:"system_reset_type"`
-	JobTimeout      types.Int64     `tfsdk:"job_timeout"`
-}
-
-type BiosDataSourceModel struct {
-	RedfishServer []RedfishServer `tfsdk:"server"`
-	Attributes    types.Map       `tfsdk:"attributes"`
+  storage_controller_serial_number = "SKC4910421"
+  patrol_read                      = "Manual"
 }

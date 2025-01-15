@@ -15,21 +15,11 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package models
-
-import (
-	"github.com/hashicorp/terraform-plugin-framework/types"
-)
-
-type BiosResourceModel struct {
-	Id              types.String    `tfsdk:"id"`
-	RedfishServer   []RedfishServer `tfsdk:"server"`
-	Attributes      types.Map       `tfsdk:"attributes"`
-	SystemResetType types.String    `tfsdk:"system_reset_type"`
-	JobTimeout      types.Int64     `tfsdk:"job_timeout"`
-}
-
-type BiosDataSourceModel struct {
-	RedfishServer []RedfishServer `tfsdk:"server"`
-	Attributes    types.Map       `tfsdk:"attributes"`
+rack1 = {
+  "batman" = {
+    username     = "admin"
+    password     = "adminADMIN123"
+    endpoint     = "https://10.172.201.240"
+    ssl_insecure = true
+  },
 }

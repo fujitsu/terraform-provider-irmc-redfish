@@ -21,15 +21,19 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/types"
 )
 
-type BiosResourceModel struct {
-	Id              types.String    `tfsdk:"id"`
-	RedfishServer   []RedfishServer `tfsdk:"server"`
-	Attributes      types.Map       `tfsdk:"attributes"`
-	SystemResetType types.String    `tfsdk:"system_reset_type"`
-	JobTimeout      types.Int64     `tfsdk:"job_timeout"`
+type FirmwareInventory struct {
+	ID            types.String    `tfsdk:"id"`
+	RedfishServer []RedfishServer `tfsdk:"server"`
+	Inventory     []Inventory     `tfsdk:"inventory"`
 }
 
-type BiosDataSourceModel struct {
-	RedfishServer []RedfishServer `tfsdk:"server"`
-	Attributes    types.Map       `tfsdk:"attributes"`
+type Inventory struct {
+	OdataID    types.String `tfsdk:"odata_id"`
+	Id         types.String `tfsdk:"id"`
+	Name       types.String `tfsdk:"name"`
+	SoftwareId types.String `tfsdk:"software_id"`
+	Updateable types.Bool   `tfsdk:"updateable"`
+	Version    types.String `tfsdk:"version"`
+	State      types.String `tfsdk:"state"`
+	Health     types.String `tfsdk:"health"`
 }

@@ -71,28 +71,6 @@ type physical_disk_group struct {
 	Group []string
 }
 
-// getSystemStorageFromSerialNumber returns pointer to storage resource
-// represented by requested serial number.
-func getSystemStorageFromSerialNumber(service *gofish.Service, serial string) (*redfish.Storage, error) {
-	system, err := GetSystemResource(service)
-	if err != nil {
-		return nil, err
-	}
-
-	list_of_storage_controllers, err := system.Storage()
-	if err != nil {
-		return nil, err
-	}
-
-	for _, storage := range list_of_storage_controllers {
-		if storage.StorageControllers[0].SerialNumber == serial {
-			return storage, nil
-		}
-	}
-
-	return nil, fmt.Errorf("Requested Storage resource has not been found on list")
-}
-
 // getSystemStorageOemRaidCapabilitiesResource tries to access RAIDCapabilities endpoint
 // related with RAID storage endpoint and returns response as structure in case of success.
 func getSystemStorageOemRaidCapabilitiesResource(service *gofish.Service, endpoint string) (raidCapabilitiesConfig, error) {

@@ -12,7 +12,7 @@ require (
 	github.com/hashicorp/terraform-plugin-log v0.9.0
 	github.com/hashicorp/terraform-plugin-testing v1.6.0
 	github.com/joho/godotenv v1.5.1
-	github.com/stmcginnis/gofish v0.17.0
+	github.com/stmcginnis/gofish v0.20.0
 )
 
 require (
