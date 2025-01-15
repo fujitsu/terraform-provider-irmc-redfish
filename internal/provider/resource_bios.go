@@ -250,7 +250,7 @@ func (r *BiosResource) Update(ctx context.Context, req resource.UpdateRequest, r
 		return
 	}
 
-	adjustedAttributes, diags := validateAndAdjustPlannedAttributes(ctx, api.Service, plannedAttributes)
+	adjustedAttributes, diags := validateAndAdjustPlannedIrmcAttributes(ctx, api.Service, plannedAttributes)
 	resp.Diagnostics.Append(diags...)
 	if diags.HasError() {
 		return
@@ -359,7 +359,7 @@ func validateAndAdjustPlannedAttributes(ctx context.Context, service *gofish.Ser
 
 	// Since Attributes in Redfish API have different types than string only, they must be unified to map of strings
 	// to be easily handled and compared with planned attributes
-	currAttributes := convertRedfishBiosAttributesToUnifiedFormat(rBios.Attributes)
+	currAttributes := convertRedfishAttributesToUnifiedFormat(rBios.Attributes)
 
 	newAttributes := make(map[string]interface{})
 
@@ -414,7 +414,7 @@ func validateAndAdjustPlannedAttributes(ctx context.Context, service *gofish.Ser
 }
 
 // convertRedfishBiosAttributesToUnifiedFormat converts attributes to common map[string]string format.
-func convertRedfishBiosAttributesToUnifiedFormat(input redfish.SettingsAttributes) map[string]string {
+func convertRedfishAttributesToUnifiedFormat(input redfish.SettingsAttributes) map[string]string {
 	attributes := make(map[string]string)
 	for key, val := range input {
 		if attrValue, ok := val.(string); ok {
@@ -462,7 +462,7 @@ func readBiosAttributesSettingsToModel(ctx context.Context, service *gofish.Serv
 
 	attributesIntoModel := make(map[string]attr.Value)
 
-	attributes := convertRedfishBiosAttributesToUnifiedFormat(rBios.Attributes)
+	attributes := convertRedfishAttributesToUnifiedFormat(rBios.Attributes)
 	configuredAttributes := attrMap.Elements()
 	for key, val := range attributes {
 		if isAttributeSupported(key) {

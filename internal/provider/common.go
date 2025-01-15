@@ -45,6 +45,7 @@ const (
 	simpleUpdate           string = "simple_update"
 	firmwareInventory      string = "firmware_inventory"
 	storageName            string = "storage"
+	iRMCAttributes         string = "irmc_attributes"
 )
 
 const (
