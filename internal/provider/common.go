@@ -205,6 +205,20 @@ func GetSystemResource(service *gofish.Service) (*redfish.ComputerSystem, error)
 	return nil, fmt.Errorf("Requested System resource has not been found on list")
 }
 
+func difference(a, b []string) []string {
+	mb := make(map[string]struct{}, len(b))
+	for _, x := range b {
+		mb[x] = struct{}{}
+	}
+	var diff []string
+	for _, x := range a {
+		if _, found := mb[x]; !found {
+			diff = append(diff, x)
+		}
+	}
+	return diff
+}
+
 func retryConnectWithTimeout(ctx context.Context, pconfig *IrmcProvider, rserver *[]models.RedfishServer) (*gofish.APIClient, error) {
 	startTime := time.Now()
 	var apiClient *gofish.APIClient
