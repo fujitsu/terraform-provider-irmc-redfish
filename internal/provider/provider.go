@@ -125,6 +125,7 @@ func (p *IrmcProvider) Resources(ctx context.Context) []func() resource.Resource
 		NewBiosResource,
 		NewUserAccountResource,
 		NewSimpleUpdateResource,
+		NewStorageResource,
 	}
 }
 
@@ -133,6 +134,7 @@ func (p *IrmcProvider) DataSources(ctx context.Context) []func() datasource.Data
 		NewVirtualMediaDataSource,
 		NewBiosDataSource,
 		NewFirmwareInventoryDataSource,
+		NewStorageDataSource,
 	}
 }
 
