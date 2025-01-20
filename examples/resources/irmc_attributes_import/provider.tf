@@ -1,5 +1,5 @@
 /*
-Copyright (c) 2024 Fsas Technologies Inc., or its subsidiaries. All Rights Reserved.
+Copyright (c) 2025 Fsas Technologies Inc., or its subsidiaries. All Rights Reserved.
 
 Licensed under the Mozilla Public License Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -15,18 +15,13 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-resource "irmc-redfish_irmc_attributes" "attr" {
-  for_each = var.rack1
-  server {
-    username     = each.value.username
-    password     = each.value.password
-    endpoint     = each.value.endpoint
-    ssl_insecure = each.value.ssl_insecure
-  }
-
-  attributes = {
-    "BmcSnmpServicePort" : "161"
-    "BmcSnmpServiceCommunityName" : "public"
-    "BmcCasAssignConfiguredPermissions" : "yyy"
+terraform {
+  required_providers {
+    irmc-redfish = {
+      version = "1.0.0"
+      source  = "hashicorp/fujitsu/irmc-redfish"
+    }
   }
 }
+
+provider "irmc-redfish" {}

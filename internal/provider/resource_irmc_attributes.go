@@ -24,6 +24,7 @@ import (
 	"io"
 	"net/http"
 	"strconv"
+	"strings"
 
 	"terraform-provider-irmc-redfish/internal/models"
 
@@ -44,7 +45,6 @@ import (
 )
 
 const IRMC_ATTRIBUTES_SETTINGS_ENDPOINT = "/redfish/v1/Managers/iRMC/Oem/ts_fujitsu/iRMCConfiguration/Attributes"
-const HTTP_HEADER_LOCATION = "Location"
 
 // Ensure provider defined types fully satisfy framework interfaces.
 var _ resource.Resource = &IrmcAttributesResource{}
@@ -462,35 +462,38 @@ func waitTillIrmcAttributesSettingsApplied(ctx context.Context, service *gofish.
 			diags.AddError("Task logs for patching attributes", string(logs))
 		}
 	} else {
-		// TODO: verify logs in positively finished task
+		diags = verifyErrorsInIrmcAttributesTaskLog(service, task_location)
 	}
 
 	return diags
 }
 
-func verifyErrorsInTaskLog(ctx context.Context, service *gofish.Service, task_location string) (diags diag.Diagnostics) {
+type taskLog struct {
+	Messages []struct {
+		Time    string `json:"Time"`
+		Message string `json:"Message"`
+	} `json:"Messages"`
+}
+
+func verifyErrorsInIrmcAttributesTaskLog(service *gofish.Service, task_location string) (diags diag.Diagnostics) {
+	logs_bytes, internal_diags := FetchRedfishTaskLog(service, task_location)
+	if logs_bytes == nil {
+		diags = append(diags, internal_diags...)
+	} else {
+		var config taskLog
+		err := json.Unmarshal(logs_bytes, &config)
+		if err != nil {
+			diags.AddError("Task logs could not be unmarshalled", err.Error())
+			return diags
+		}
+
+		for _, v := range config.Messages {
+			if strings.Contains(v.Message, "Error") {
+				diags.AddError("Task log contains error message(s)", v.Message)
+			}
+		}
+
+	}
+
 	return diags
-	/*
-	   // TODO: analysis of ~ such logs
-	   {
-	     "@odata.id": "/redfish/v1/TaskService/Tasks/13/Oem/ts_fujitsu/Logs",
-	     "@odata.type": "#FTSTaskLog.v1_1_0.FTSTaskLog",
-	     "Name": "Task logs",
-	     "Messages": [
-	       {
-	         "Time": "2025-01-15T15:07:32+00:00",
-	         "Message": "Patch attributes in progress"
-	       },
-	       {
-	         "Time": "2025-01-15T15:07:37+00:00",
-	         "Message": "RedfishTaskManager: Error. The value YYY for the property PostErrorHalt exceeds allowed range or size"
-	       },
-	       {
-	         "Time": "2025-01-15T15:07:37+00:00",
-	         "Message": "Patch attributes successful"
-	       }
-	     ],
-	     "@Redfish.Copyright": "Copyright 2017-2020 FUJITSU LIMITED"
-	   }
-	*/
 }

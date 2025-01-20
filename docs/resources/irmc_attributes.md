@@ -8,6 +8,8 @@ description: |-
 # irmc-redfish_irmc_attributes (Resource)
 
 The resource is used to control (read, modify or import) iRMC attributes settings on Fujitsu server equipped with iRMC controller.
+To get list of all supported attributes with their types and limitations, please access the following Redfish resource:
+/redfish/v1/Registries/ManagerAttributeRegistry/ManagerAttributeRegistry.v1_0_0.json
 
 
 ## Schema

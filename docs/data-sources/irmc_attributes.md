@@ -7,7 +7,9 @@ description: |-
 
 # irmc-redfish_irmc_attributes (Data Source)
 
-This datasource is used to query iRMC attributes
+This datasource is used to query iRMC attributes.
+To get list of all supported attributes with their types and limitations, please access the following Redfish resource:
+/redfish/v1/Registries/ManagerAttributeRegistry/ManagerAttributeRegistry.v1_0_0.json
 
 
 ## Schema

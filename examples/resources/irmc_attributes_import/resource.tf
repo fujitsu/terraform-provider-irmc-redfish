@@ -1,5 +1,5 @@
 /*
-Copyright (c) 2024 Fsas Technologies Inc., or its subsidiaries. All Rights Reserved.
+Copyright (c) 2025 Fsas Technologies Inc., or its subsidiaries. All Rights Reserved.
 
 Licensed under the Mozilla Public License Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -16,17 +16,14 @@ limitations under the License.
 */
 
 resource "irmc-redfish_irmc_attributes" "attr" {
-  for_each = var.rack1
   server {
-    username     = each.value.username
-    password     = each.value.password
-    endpoint     = each.value.endpoint
-    ssl_insecure = each.value.ssl_insecure
+    username     = "admin"
+    password     = "adminADMIN123"
+    endpoint     = "https://10.172.201.240"
+    ssl_insecure = true
   }
 
   attributes = {
-    "BmcSnmpServicePort" : "161"
-    "BmcSnmpServiceCommunityName" : "public"
-    "BmcCasAssignConfiguredPermissions" : "yyy"
+    "BmcSnmpServiceCommunityName" : "public2"
   }
 }
