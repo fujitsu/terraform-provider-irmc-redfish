@@ -46,11 +46,13 @@ const (
 	firmwareInventory      string = "firmware_inventory"
 	storageName            string = "storage"
 	systemBoot             string = "system_boot"
+	firmwareUpdate         string = "irmc_firmware_update"
 )
 
 const (
 	HTTP_HEADER_IF_MATCH = "If-Match"
 	HTTP_HEADER_ETAG     = "ETag"
+	HTTP_HEADER_LOCATION = "Location"
 )
 
 type ServerConfig struct {
