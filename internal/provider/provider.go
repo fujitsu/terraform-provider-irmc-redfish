@@ -127,6 +127,7 @@ func (p *IrmcProvider) Resources(ctx context.Context) []func() resource.Resource
 		NewSimpleUpdateResource,
 		NewStorageResource,
 		NewStorageVolumeResource,
+		NewIrmcFirmwareUpdateResource,
 	}
 }
 
