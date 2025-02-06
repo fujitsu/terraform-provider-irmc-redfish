@@ -54,7 +54,6 @@ type StorageVolumeResource struct {
 const (
 	STORAGE_COLLECTION_ENDPOINT        = "/redfish/v1/Systems/0/Storage"
 	STORAGE_RAIDCAPABILITIES_SUFFIX    = "/Oem/ts_fujitsu/RAIDCapabilities"
-	HTTP_HEADER_LOCATION               = "Location"
 	STORAGE_VOLUME_RESOURCE_NAME       = "resource-storage_volume"
 	STORAGE_VOLUME_JOB_DEFAULT_TIMEOUT = 300
 )
