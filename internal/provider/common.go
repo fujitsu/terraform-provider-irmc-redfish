@@ -47,6 +47,7 @@ const (
 	storageName            string = "storage"
 	systemBoot             string = "system_boot"
 	firmwareUpdate         string = "irmc_firmware_update"
+	iRMCAttributes         string = "irmc_attributes"
 )
 
 const (

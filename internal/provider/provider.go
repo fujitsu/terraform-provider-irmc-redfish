@@ -128,6 +128,7 @@ func (p *IrmcProvider) Resources(ctx context.Context) []func() resource.Resource
 		NewStorageResource,
 		NewStorageVolumeResource,
 		NewIrmcFirmwareUpdateResource,
+		NewIrmcAttributesResource,
 	}
 }
 
@@ -138,6 +139,7 @@ func (p *IrmcProvider) DataSources(ctx context.Context) []func() datasource.Data
 		NewFirmwareInventoryDataSource,
 		NewStorageDataSource,
 		NewSystemBootDataSource,
+		NewIrmcAttributesDataSource,
 	}
 }
 
