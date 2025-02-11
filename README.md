@@ -32,15 +32,24 @@ The provider is released and licensed under the MPL-2.0 license. See [License](L
 - [Go](https://golang.org/doc/install) >= 1.21
 
 ## List of supported data sources
+* [Bios](docs/data-sources/bios.md)
+* [Firmware inventory](docs/data-sources/firmware_inventory.md)
+* [Storage](docs/data-sources/storage.md)
+* [System boot](docs/data-sources/system_boot.md)
 * [Virtual media](docs/data-sources/virtual_media.md)
 
 ## List of supported resources
 * [Bios](docs/resources/bios.md)
 * [Boot order](docs/resources/boot_order.md)
 * [Boot source override](docs/resources/boot_source_override.md)
+* [Certificate CA CAS SMTP](docs/resources/certificate_ca_cas_smtp.md)
+* [Certificate CA for Update and Deployment](docs/resources/certificate_ca_upd_deploy.md)
+* [Certificate Web Server](docs/resources/certificate_web_server.md)
+* [iRMC firmware update](docs/resources/irmc_firmware_update.md)
 * [iRMC reset](docs/resources/irmc_reset.md)
 * [Power](docs/resources/power.md)
 * [Simple update](docs/resources/simple_update.md)
 * [Storage volume](docs/resources/storage_volume.md)
+* [Storage](docs/resources/storage.md)
 * [User account](docs/resources/user_account.md)
 * [Virtual media](docs/resources/virtual_media.md)

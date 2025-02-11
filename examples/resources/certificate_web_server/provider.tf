@@ -15,17 +15,13 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-rack1 = {
-  "avenger" = {
-    username     = "admin"
-    password     = "adminADMIN11"
-    endpoint     = "https://10.172.201.245"
-    ssl_insecure = true
-  },
-  "batman" = {
-    username     = "admin"
-    password     = "adminADMIN123"
-    endpoint     = "https://10.172.201.40"
-    ssl_insecure = true
-  },
+terraform {
+  required_providers {
+    irmc-redfish = {
+      version = "1.0.0"
+      source  = "hashicorp/fujitsu/irmc-redfish"
+    }
+  }
 }
+
+provider "irmc-redfish" {}

@@ -1,5 +1,5 @@
 /*
-Copyright (c) 2024 Fsas Technologies Inc., or its subsidiaries. All Rights Reserved.
+Copyright (c) 2025 Fsas Technologies Inc., or its subsidiaries. All Rights Reserved.
 
 Licensed under the Mozilla Public License Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -15,17 +15,16 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-rack1 = {
-  "avenger" = {
-    username     = "admin"
-    password     = "adminADMIN11"
-    endpoint     = "https://10.172.201.245"
-    ssl_insecure = true
-  },
-  "batman" = {
-    username     = "admin"
-    password     = "adminADMIN123"
-    endpoint     = "https://10.172.201.40"
-    ssl_insecure = true
-  },
+package models
+
+import (
+	"github.com/hashicorp/terraform-plugin-framework/types"
+)
+
+// CertificateWebServerResourceModel describes the resource data model.
+type CertificateWebServerResourceModel struct {
+	Id             types.String    `tfsdk:"id"`
+	RedfishServer  []RedfishServer `tfsdk:"server"`
+	CertPrivateKey types.String    `tfsdk:"cert_private_key"`
+	CertPublicKey  types.String    `tfsdk:"cert_public_key"`
 }
