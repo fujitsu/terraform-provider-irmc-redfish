@@ -48,6 +48,9 @@ const (
 	systemBoot             string = "system_boot"
 	firmwareUpdate         string = "irmc_firmware_update"
 	iRMCAttributes         string = "irmc_attributes"
+	certificateCaUpdDeploy string = "certificate_ca_upd_deploy"
+	certificateWebServer   string = "certificate_web_server"
+	certificateCaCasSmtp   string = "certificate_ca_cas_smtp"
 )
 
 const (
@@ -67,6 +70,11 @@ type CommonImportConfig struct {
 	ServerConfig
 	ID string `json:"id"`
 }
+
+const (
+	IRMC_RESET_TIMEOUT             = 600
+	IRMC_RESET_CHECK_INTERVAL_TIME = 10
+)
 
 // RedfishServerDatasourceSchema to construct schema of redfish server.
 func RedfishServerDatasourceSchema() map[string]datasourceSchema.Attribute {
@@ -241,4 +249,28 @@ func retryConnectWithTimeout(ctx context.Context, pconfig *IrmcProvider, rserver
 	}
 
 	return nil, fmt.Errorf("connection timed out after 10 minutes: %w", err)
+}
+
+func restartIrmc(ctx context.Context, api *gofish.APIClient, RedfishServer []models.RedfishServer, provider *IrmcProvider) error {
+	managers, err := api.Service.Managers()
+	if err != nil {
+		return fmt.Errorf("error retrieving Managers resource: %w", err)
+	}
+
+	err = managers[0].Reset(redfish.GracefulRestartResetType)
+	if err != nil {
+		return fmt.Errorf("error resetting iRMC: %w", err)
+	}
+
+	api, err = retryConnectWithTimeout(ctx, provider, &RedfishServer)
+	if err != nil {
+		return fmt.Errorf("service connect target system error: %w", err)
+	}
+
+	err = checkIrmcStatus(ctx, api, IRMC_RESET_CHECK_INTERVAL_TIME, IRMC_RESET_TIMEOUT)
+	if err != nil {
+		return fmt.Errorf("failed to check irmc status after reboot request : %w", err)
+	}
+
+	return nil
 }
