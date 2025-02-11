@@ -1,12 +1,12 @@
 PROVIDER_NAME=irmc-redfish
-VERSION?=1.0.0
+VERSION?=0.0.1
 BINARY=terraform-provider-${PROVIDER_NAME}
 OS_ARCH=linux_amd64
 INSTALL_ROOT?=~/.terraform.d/plugins
 HOSTNAME=registry.terraform.io
 NAMESPACE=fujitsu
-OLD_PROVIDER_VERSION=1.0.0
-NEW_PROVIDER_VERSION=0.0.1
+OLD_PROVIDER_VERSION=0.0.0
+NEW_PROVIDER_VERSION=${VERSION}
 
 default: testacc
 
