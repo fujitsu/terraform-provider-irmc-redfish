@@ -22,6 +22,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"strings"
 	"terraform-provider-irmc-redfish/internal/models"
 	"terraform-provider-irmc-redfish/internal/validators"
 
@@ -372,7 +373,7 @@ func handleFileUpdate(api *gofish.APIClient, plan *models.IrmcFirmwareUpdateReso
 
 func readFirmwareFile(filePath string) (*os.File, error) {
 
-	if filepath.Ext(filePath) != ".bin" {
+	if strings.ToLower(filepath.Ext(filePath)) != ".bin" {
 		return nil, fmt.Errorf("invalid file type: %s, only .bin files are allowed", filepath.Ext(filePath))
 	}
 

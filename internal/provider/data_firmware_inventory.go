@@ -129,11 +129,13 @@ func (d *IrmcFirmwareInventoryDataSource) Configure(ctx context.Context, req dat
 
 func (d *IrmcFirmwareInventoryDataSource) Read(ctx context.Context, req datasource.ReadRequest, resp *datasource.ReadResponse) {
 
+	tflog.Info(ctx, "data-firmware-inventory: read starts")
+
 	// Read Terraform configuration data into the model
 	var data models.FirmwareInventory
 	resp.Diagnostics.Append(req.Config.Get(ctx, &data)...)
 	if resp.Diagnostics.HasError() {
-		tflog.Trace(ctx, "has error!")
+		tflog.Error(ctx, "has error!")
 		return
 	}
 
@@ -154,6 +156,8 @@ func (d *IrmcFirmwareInventoryDataSource) Read(ctx context.Context, req datasour
 
 	// Save data into Terraform state
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
+
+	tflog.Info(ctx, "data-firmware-inventory: read ends")
 }
 
 func GetFirmwareInventoryList(api *gofish.APIClient) ([]models.Inventory, error) {

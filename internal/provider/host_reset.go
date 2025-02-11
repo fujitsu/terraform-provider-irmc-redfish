@@ -94,8 +94,10 @@ func isBiosInPOSTPhase(service *gofish.Service) (bool, error) {
 		return false, err
 	}
 
+	defer res.Body.Close()
+
 	if res.StatusCode != http.StatusOK {
-		return false, fmt.Errorf("Return status code != 200")
+		return false, fmt.Errorf("unexpected status code: %d", res.StatusCode)
 	}
 
 	bodyBytes, err := io.ReadAll(res.Body)
@@ -163,7 +165,7 @@ func waitUntilHostStateChangedEnhanced(service *gofish.Service, expectedPoweredO
 			}
 
 			if time.Now().Unix()-startTime > timeout {
-				return fmt.Errorf("Operation not finished within given timeout %d", timeout)
+				return fmt.Errorf("operation not finished within given timeout %d", timeout)
 			}
 		}
 	}

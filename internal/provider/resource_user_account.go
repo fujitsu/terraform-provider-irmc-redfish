@@ -40,6 +40,16 @@ import (
 	"github.com/stmcginnis/gofish/redfish"
 )
 
+const (
+	USER_TYPE_ADMIN          = "Administrator"
+	USER_TYPE_OPERATOR       = "Operator"
+	USER_TYPE_USER           = "User"
+	USER_TYPE_READ_ONLY      = "ReadOnly"
+	USER_TYPE_OEM            = "OEM"
+	USER_TYPE_REMOTE_MANAGER = "RemoteManager"
+	USER_TYPE_NONE           = "None"
+)
+
 type RedfishRequest struct {
 	Enabled     bool   `json:"Enabled"`
 	RoleId      string `json:"RoleId"`
@@ -165,12 +175,12 @@ func (r *IrmcUserAccountResource) Schema(ctx context.Context, req resource.Schem
 				Description:         "Role of the user. Available values are 'Administrator', 'Operator', and 'ReadOnly'.",
 				Optional:            true,
 				Computed:            true,
-				Default:             stringdefault.StaticString("Administrator"),
+				Default:             stringdefault.StaticString(USER_TYPE_ADMIN),
 				Validators: []validator.String{
 					stringvalidator.OneOf([]string{
-						"Administrator",
-						"Operator",
-						"ReadOnly",
+						USER_TYPE_ADMIN,
+						USER_TYPE_OPERATOR,
+						USER_TYPE_READ_ONLY,
 					}...),
 				},
 			},
@@ -193,13 +203,13 @@ func (r *IrmcUserAccountResource) Schema(ctx context.Context, req resource.Schem
 				Description:         "LAN Channel Privilege of the user. Available values are 'Administrator', 'Operator', 'User', and 'OEM'.",
 				Optional:            true,
 				Computed:            true,
-				Default:             stringdefault.StaticString("Administrator"),
+				Default:             stringdefault.StaticString(USER_TYPE_ADMIN),
 				Validators: []validator.String{
 					stringvalidator.OneOf([]string{
-						"Administrator",
-						"Operator",
-						"User",
-						"OEM",
+						USER_TYPE_ADMIN,
+						USER_TYPE_OPERATOR,
+						USER_TYPE_USER,
+						USER_TYPE_OEM,
 					}...),
 				},
 			},
@@ -208,13 +218,13 @@ func (r *IrmcUserAccountResource) Schema(ctx context.Context, req resource.Schem
 				Description:         "Serial Channel Privilege of the user. Available values are 'Administrator', 'Operator', 'User', and 'OEM'.",
 				Optional:            true,
 				Computed:            true,
-				Default:             stringdefault.StaticString("Administrator"),
+				Default:             stringdefault.StaticString(USER_TYPE_ADMIN),
 				Validators: []validator.String{
 					stringvalidator.OneOf([]string{
-						"Administrator",
-						"Operator",
-						"User",
-						"OEM",
+						USER_TYPE_ADMIN,
+						USER_TYPE_OPERATOR,
+						USER_TYPE_USER,
+						USER_TYPE_OEM,
 					}...),
 				},
 			},
@@ -251,9 +261,11 @@ func (r *IrmcUserAccountResource) Schema(ctx context.Context, req resource.Schem
 				Description:         "Specifies the shell access level for the user. Available values are 'RemoteManager' and 'None'.",
 				Optional:            true,
 				Computed:            true,
-				Default:             stringdefault.StaticString("RemoteManager"),
+				Default:             stringdefault.StaticString(USER_TYPE_REMOTE_MANAGER),
 				Validators: []validator.String{
-					stringvalidator.OneOf("RemoteManager", "None"),
+					stringvalidator.OneOf(
+						USER_TYPE_REMOTE_MANAGER,
+						USER_TYPE_NONE),
 				},
 			},
 			"user_alert_chassis_events": schema.BoolAttribute{

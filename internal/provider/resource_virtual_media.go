@@ -38,6 +38,16 @@ import (
 	"github.com/stmcginnis/gofish/redfish"
 )
 
+type VmediaImageType int
+
+const (
+	IMAGE_TYPE_UNKNOWN VmediaImageType = iota
+	IMAGE_TYPE_ISO
+	IMAGE_TYPE_IMG
+)
+
+const VMEDIA_ENDPOINT = "/redfish/v1/Managers/iRMC/VirtualMedia/"
+
 // Ensure provider defined types fully satisfy framework interfaces.
 var _ resource.Resource = &VirtualMediaResource{}
 var _ resource.ResourceWithImportState = &VirtualMediaResource{}
@@ -49,22 +59,6 @@ func NewVirtualMediaResource() resource.Resource {
 // VirtualMediaResource defines the resource implementation.
 type VirtualMediaResource struct {
 	p *IrmcProvider
-}
-
-const VMEDIA_ENDPOINT = "/redfish/v1/Managers/iRMC/VirtualMedia/"
-
-func (r *VirtualMediaResource) updateVirtualMediaState(response *redfish.VirtualMedia, plan models.VirtualMediaResourceModel) models.VirtualMediaResourceModel {
-	var new_id strings.Builder
-	new_id.WriteString(VMEDIA_ENDPOINT)
-	new_id.WriteString(response.ID)
-
-	return models.VirtualMediaResourceModel{
-		Id:                   types.StringValue(new_id.String()),
-		Image:                types.StringValue(response.Image),
-		Inserted:             types.BoolValue(response.Inserted),
-		TransferProtocolType: types.StringValue(string(response.TransferProtocolType)),
-		RedfishServer:        plan.RedfishServer,
-	}
 }
 
 func (r *VirtualMediaResource) Metadata(ctx context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
@@ -127,107 +121,6 @@ func (r *VirtualMediaResource) Configure(ctx context.Context, req resource.Confi
 
 	r.p = p
 }
-
-type virtualMediaEnvironment struct {
-	collection []*redfish.VirtualMedia
-	client     *gofish.APIClient
-}
-
-func (r *VirtualMediaResource) GetVirtualMediaEnvironment(rserver *[]models.RedfishServer) (virtualMediaEnvironment, diag.Diagnostics) {
-	var env virtualMediaEnvironment
-	var d diag.Diagnostics
-	var manager []*redfish.Manager
-
-	api, err := ConnectTargetSystem(r.p, rserver)
-	if err != nil {
-		d.AddError("Error while connecting to SUT", err.Error())
-		return env, d
-	}
-
-	env.client = api
-
-	manager, err = api.Service.Managers()
-	if err != nil {
-		d.AddError("Error when accessing Managers resource", err.Error())
-		return env, d
-	}
-
-	vmediaCollection, err := manager[0].VirtualMedia()
-	if err != nil {
-		d.AddError("Could not retrieve vmedia collection from redfish API", err.Error())
-		return env, d
-	}
-
-	if len(vmediaCollection) != 0 {
-		env.collection = vmediaCollection
-	}
-
-	return env, d
-}
-
-func GetVirtualMedia(vmediaID string, vms []*redfish.VirtualMedia) (*redfish.VirtualMedia, error) {
-	for _, v := range vms {
-		if v.ID == vmediaID {
-			return v, nil
-		}
-	}
-
-	return nil, fmt.Errorf("virtual media with ID %s does not exist", vmediaID)
-}
-
-// WaitForMediaSuccessfullyMounted checks requested endpoint of given service
-// until the endpoint will returned Inserted as true or counter will reach limit.
-func WaitForMediaSuccessfullyMounted(service *gofish.Service, endpoint string) (*redfish.VirtualMedia, error) {
-	cnt := 20 // number of tries every second
-	virtualMedia, err := redfish.GetVirtualMedia(service.GetClient(), endpoint)
-	for cnt > 0 {
-		if err != nil {
-			return nil, fmt.Errorf("%d Could not read media state %s due to %w", cnt, endpoint, err)
-		}
-
-		if virtualMedia.Inserted {
-			break
-		}
-
-		time.Sleep(1 * time.Second)
-		cnt--
-
-		virtualMedia, err = redfish.GetVirtualMedia(service.GetClient(), endpoint)
-	}
-	return virtualMedia, nil
-}
-
-func InsertMedia(ctx context.Context, id string, collection []*redfish.VirtualMedia, config redfish.VirtualMediaConfig, service *gofish.Service) (*redfish.VirtualMedia, error) {
-	virtualMedia, err := GetVirtualMedia(id, collection)
-	if err != nil {
-		return nil, fmt.Errorf("Virtual media with ID %s does not exist", id)
-	}
-
-	if virtualMedia.Inserted {
-		tflog.Error(ctx, "Media insert has been requested on endpoint which has already mounted media")
-		return nil, err
-	}
-
-	err = virtualMedia.InsertMediaConfig(config)
-	if err != nil {
-		return nil, fmt.Errorf("Could not mount vmedia %s: %w", id, err)
-	}
-
-	virtualMedia, err = WaitForMediaSuccessfullyMounted(service, virtualMedia.ODataID)
-	if err != nil {
-		return nil, fmt.Errorf("Reading status of selected virtual media finished with error: %w", err)
-	}
-
-	return virtualMedia, nil
-}
-
-type VmediaImageType int
-
-const (
-	IMAGE_TYPE_UNKNOWN VmediaImageType = iota
-	IMAGE_TYPE_ISO
-	IMAGE_TYPE_IMG
-)
 
 func (r *VirtualMediaResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
 	tflog.Info(ctx, "resource-virtual_media: create starts")
@@ -474,7 +367,7 @@ func (r *VirtualMediaResource) ImportState(ctx context.Context, req resource.Imp
 	var config CommonImportConfig
 	err := json.Unmarshal([]byte(req.ID), &config)
 	if err != nil {
-		resp.Diagnostics.AddError("Error while 2 unmarshalling import config", err.Error())
+		resp.Diagnostics.AddError("Error while unmarshalling import config", err.Error())
 		return
 	}
 
@@ -518,4 +411,111 @@ func (r *VirtualMediaResource) ImportState(ctx context.Context, req resource.Imp
 	resp.Diagnostics.Append(diags...)
 
 	tflog.Info(ctx, "resource-virtual_media: import ends")
+}
+
+type virtualMediaEnvironment struct {
+	collection []*redfish.VirtualMedia
+	client     *gofish.APIClient
+}
+
+func (r *VirtualMediaResource) updateVirtualMediaState(response *redfish.VirtualMedia, plan models.VirtualMediaResourceModel) models.VirtualMediaResourceModel {
+	var new_id strings.Builder
+	new_id.WriteString(VMEDIA_ENDPOINT)
+	new_id.WriteString(response.ID)
+
+	return models.VirtualMediaResourceModel{
+		Id:                   types.StringValue(new_id.String()),
+		Image:                types.StringValue(response.Image),
+		Inserted:             types.BoolValue(response.Inserted),
+		TransferProtocolType: types.StringValue(string(response.TransferProtocolType)),
+		RedfishServer:        plan.RedfishServer,
+	}
+}
+
+func (r *VirtualMediaResource) GetVirtualMediaEnvironment(rserver *[]models.RedfishServer) (virtualMediaEnvironment, diag.Diagnostics) {
+	var env virtualMediaEnvironment
+	var d diag.Diagnostics
+	var manager []*redfish.Manager
+
+	api, err := ConnectTargetSystem(r.p, rserver)
+	if err != nil {
+		d.AddError("Error while connecting to SUT", err.Error())
+		return env, d
+	}
+
+	env.client = api
+
+	manager, err = api.Service.Managers()
+	if err != nil {
+		d.AddError("Error when accessing Managers resource", err.Error())
+		return env, d
+	}
+
+	vmediaCollection, err := manager[0].VirtualMedia()
+	if err != nil {
+		d.AddError("Could not retrieve vmedia collection from redfish API", err.Error())
+		return env, d
+	}
+
+	if len(vmediaCollection) != 0 {
+		env.collection = vmediaCollection
+	}
+
+	return env, d
+}
+
+func GetVirtualMedia(vmediaID string, vms []*redfish.VirtualMedia) (*redfish.VirtualMedia, error) {
+	for _, v := range vms {
+		if v.ID == vmediaID {
+			return v, nil
+		}
+	}
+
+	return nil, fmt.Errorf("virtual media with ID %s does not exist", vmediaID)
+}
+
+// WaitForMediaSuccessfullyMounted checks requested endpoint of given service
+// until the endpoint will returned Inserted as true or counter will reach limit.
+func WaitForMediaSuccessfullyMounted(service *gofish.Service, endpoint string) (*redfish.VirtualMedia, error) {
+	cnt := 20 // number of tries every second
+	virtualMedia, err := redfish.GetVirtualMedia(service.GetClient(), endpoint)
+	for cnt > 0 {
+		if err != nil {
+			return nil, fmt.Errorf("%d Could not read media state %s due to %w", cnt, endpoint, err)
+		}
+
+		if virtualMedia.Inserted {
+			break
+		}
+
+		time.Sleep(1 * time.Second)
+		cnt--
+
+		virtualMedia, err = redfish.GetVirtualMedia(service.GetClient(), endpoint)
+	}
+	return virtualMedia, nil
+}
+
+func InsertMedia(ctx context.Context, id string, collection []*redfish.VirtualMedia, config redfish.VirtualMediaConfig, service *gofish.Service) (*redfish.VirtualMedia, error) {
+	virtualMedia, err := GetVirtualMedia(id, collection)
+	if err != nil {
+		return nil, fmt.Errorf("virtual media with ID %s does not exist", id)
+	}
+
+	if virtualMedia.Inserted {
+		tflog.Error(ctx, "Media insert has been requested on endpoint which has already mounted media")
+		return nil, err
+	}
+
+	err = virtualMedia.InsertMediaConfig(config)
+	if err != nil {
+		return nil, fmt.Errorf("could not mount vmedia %s: %w", id, err)
+	}
+
+	virtualMedia, err = WaitForMediaSuccessfullyMounted(service, virtualMedia.ODataID)
+	if err != nil {
+		return nil, fmt.Errorf("reading status of selected virtual media finished with error: %w", err)
+	}
+
+	return virtualMedia, nil
 }

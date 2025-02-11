@@ -77,22 +77,22 @@ func getSystemStorageOemRaidCapabilitiesResource(service *gofish.Service, endpoi
 	res, err := service.GetClient().Get(endpoint)
 	var config raidCapabilitiesConfig
 	if err != nil {
-		return config, fmt.Errorf("Could not access RAIDCapabilities resource due to: %s", err.Error())
+		return config, fmt.Errorf("could not access RAIDCapabilities resource due to: %s", err.Error())
 	}
 	defer res.Body.Close()
 
 	if res.StatusCode != http.StatusOK {
-		return config, fmt.Errorf("Could not access RAIDCapabilities resource, http code %d", res.StatusCode)
+		return config, fmt.Errorf("could not access RAIDCapabilities resource, http code %d", res.StatusCode)
 	}
 
 	bodyBytes, err := io.ReadAll(res.Body)
 	if err != nil {
-		return config, fmt.Errorf("Error while reading response body: %s", err.Error())
+		return config, fmt.Errorf("error while reading response body: %s", err.Error())
 	}
 
 	err = json.Unmarshal(bodyBytes, &config)
 	if err != nil {
-		return config, fmt.Errorf("Error during body unmarshalling: %s", err.Error())
+		return config, fmt.Errorf("error during body unmarshalling: %s", err.Error())
 	}
 
 	return config, nil
@@ -101,7 +101,7 @@ func getSystemStorageOemRaidCapabilitiesResource(service *gofish.Service, endpoi
 func getVolumesCollectionUrl(service *gofish.Service, serial string) (url string, err error) {
 	storage, err := getSystemStorageFromSerialNumber(service, serial)
 	if err != nil {
-		return "", fmt.Errorf("Storage resource could not be obtained %s", err.Error())
+		return "", fmt.Errorf("storage resource could not be obtained %s", err.Error())
 	}
 
 	return storage.ODataID + "/Volumes", err
@@ -116,12 +116,12 @@ func validateRequestAgainstStorageControllerCapabilities(ctx context.Context, se
 
 	storage, err := getSystemStorageFromSerialNumber(service, storage_id)
 	if err != nil {
-		return physical_disk_groups, fmt.Errorf("Storage resource could not be obtained %s", err.Error())
+		return physical_disk_groups, fmt.Errorf("storage resource could not be obtained %s", err.Error())
 	}
 
 	physical_disk_groups, drives_media_type, err := verifyRequestedDisks(ctx, plan, storage)
 	if err != nil {
-		return physical_disk_groups, fmt.Errorf("Storage disk verification failed %s", err.Error())
+		return physical_disk_groups, fmt.Errorf("storage disk verification failed %s", err.Error())
 	}
 
 	// Obtain RAIDCapabilities for particular storage controller
@@ -129,7 +129,7 @@ func validateRequestAgainstStorageControllerCapabilities(ctx context.Context, se
 	var capabilities raidCapabilitiesConfig
 	capabilities, err = getSystemStorageOemRaidCapabilitiesResource(service, raidc_endpoint)
 	if err != nil {
-		return physical_disk_groups, fmt.Errorf("Storage controller capabilities could not be obtained %s", err.Error())
+		return physical_disk_groups, fmt.Errorf("storage controller capabilities could not be obtained %s", err.Error())
 	}
 
 	// Validate request against what controller supports
@@ -169,19 +169,19 @@ func validateRequestAgainstStorageControllerCapabilities(ctx context.Context, se
 			num_of_groups := len(physical_disk_groups)
 			if val.MinimumSpanCount != 0 && val.MaximumSpanCount != 0 {
 				if num_of_groups < val.MinimumSpanCount || num_of_groups > val.MaximumSpanCount {
-					return physical_disk_groups, fmt.Errorf("Requested number of disk groups %d does not match %s",
+					return physical_disk_groups, fmt.Errorf("requested number of disk groups %d does not match %s",
 						num_of_groups, val.RaidType)
 				}
 
 				min_num_of_disks_in_group := val.MinimumDriveCount / val.MinimumSpanCount
 				for i, group := range physical_disk_groups {
 					if len(group.Group) < min_num_of_disks_in_group {
-						return physical_disk_groups, fmt.Errorf("Minimal number of disks in group %d is not fulfilled", i)
+						return physical_disk_groups, fmt.Errorf("minimal number of disks in group %d is not fulfilled", i)
 					}
 				}
 			} else {
 				if num_of_groups != 1 {
-					return physical_disk_groups, fmt.Errorf("For %s only single group of disks is supported", val.RaidType)
+					return physical_disk_groups, fmt.Errorf("for %s only single group of disks is supported", val.RaidType)
 				}
 			}
 
@@ -222,7 +222,7 @@ func verifyRequestedDisks(ctx context.Context, plan models.StorageVolumeResource
 
 	drives, err := storage.Drives()
 	if err != nil {
-		return physical_disks, drives_media_type, fmt.Errorf("Could not read drives from target system %s", err.Error())
+		return physical_disks, drives_media_type, fmt.Errorf("could not read drives from target system %s", err.Error())
 	}
 
 	for _, group := range plan_physical_disks {
@@ -235,7 +235,7 @@ func verifyRequestedDisks(ctx context.Context, plan models.StorageVolumeResource
 		var disks_in_group []string
 		err = json.Unmarshal([]byte(group), &disks_in_group)
 		if err != nil {
-			return physical_disks, drives_media_type, fmt.Errorf("Could not unmarshal requested Drives '%s'", err.Error())
+			return physical_disks, drives_media_type, fmt.Errorf("could not unmarshal requested Drives '%s'", err.Error())
 		}
 
 		for _, disk := range disks_in_group {
@@ -632,7 +632,7 @@ func compareVolumePropertiesWithPlan(ctx context.Context, service *gofish.Servic
 			})
 
 		if time.Now().Unix()-start_time > timeout_s {
-			return false, fmt.Errorf("Timeout of %d s has been reached", timeout_s)
+			return false, fmt.Errorf("timeout of %d s has been reached", timeout_s)
 		}
 
 		time.Sleep(2 * time.Second)

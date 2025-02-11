@@ -21,6 +21,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"net/http"
 	"terraform-provider-irmc-redfish/internal/models"
 	"time"
 
@@ -55,6 +56,7 @@ func IrmcRestartSchema() map[string]schema.Attribute {
 	return map[string]schema.Attribute{
 		"id": schema.StringAttribute{
 			Optional:            true,
+			Computed:            true,
 			MarkdownDescription: "ID of irmc reset resource on iRMC.",
 			Description:         "ID of irmc reset resource on iRMC.",
 		},
@@ -158,24 +160,6 @@ func (r *IrmcRestartResource) Read(ctx context.Context, req resource.ReadRequest
 		return
 	}
 
-	config, err := ConnectTargetSystem(r.p, &state.RedfishServer)
-	if err != nil {
-		resp.Diagnostics.AddError("Service Connect Target System Error", err.Error())
-		return
-	}
-
-	defer config.Logout()
-
-	// Get manager
-	irmc, err := config.Service.Managers()
-	if err != nil {
-		resp.Diagnostics.AddError("Error when accessing Managers resource", err.Error())
-		return
-	}
-
-	state.Id = types.StringValue(irmc[0].ID)
-
-	// Save into State
 	diags = resp.State.Set(ctx, &state)
 	resp.Diagnostics.Append(diags...)
 	tflog.Info(ctx, "resource-irmc-reset: read ends")
@@ -213,7 +197,7 @@ func checkIrmcStatus(ctx context.Context, service *gofish.APIClient, interval in
 			continue
 		}
 
-		if resp.StatusCode == 200 {
+		if resp.StatusCode == http.StatusOK {
 			defer resp.Body.Close()
 			_, err := io.ReadAll(resp.Body)
 			if err != nil {

@@ -95,7 +95,7 @@ func WaitForRedfishTaskEnd(ctx context.Context, service *gofish.Service, locatio
 	for {
 		task, err := redfish.GetTask(service.GetClient(), location)
 		if err != nil {
-			return false, fmt.Errorf("Error during task %s retrieval %s", location, err.Error())
+			return false, fmt.Errorf("error during task %s retrieval %s", location, err.Error())
 		}
 
 		tflog.Trace(ctx, "Task details", map[string]interface{}{
@@ -108,13 +108,13 @@ func WaitForRedfishTaskEnd(ctx context.Context, service *gofish.Service, locatio
 				return true, nil
 			}
 
-			return false, fmt.Errorf("Task finished with TaskState %s", task.TaskState)
+			return false, fmt.Errorf("task finished with TaskState %s", task.TaskState)
 		} else {
 			time.Sleep(5 * time.Second)
 		}
 
 		if time.Now().Unix()-start_time > timeout_s {
-			return false, fmt.Errorf("Task has not finished within given timeout %d", timeout_s)
+			return false, fmt.Errorf("task has not finished within given timeout %d", timeout_s)
 		}
 	}
 }
