@@ -5,6 +5,8 @@ OS_ARCH=linux_amd64
 INSTALL_ROOT?=~/.terraform.d/plugins
 HOSTNAME=registry.terraform.io
 NAMESPACE=fujitsu
+OLD_PROVIDER_VERSION=1.0.0
+NEW_PROVIDER_VERSION=0.0.1
 
 default: testacc
 
@@ -21,6 +23,10 @@ lint:
 .PHONY: doc
 doc:
 	go generate
+
+.PHONY: change_examples_provider_version
+change_examples_provider_version:
+	find . -type f -name "provider.tf" -print0 | xargs -0 sed -i'' -e 's/${OLD_PROVIDER_VERSION}/${NEW_PROVIDER_VERSION}/g'
 
 .PHONY: fmt
 fmt:
