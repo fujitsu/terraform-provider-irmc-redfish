@@ -1,8 +1,8 @@
 terraform {
   required_providers {
     irmc-redfish = {
-      version = "1.0.0"
-      source  = "hashicorp/fujitsu/irmc-redfish"
+      version = "0.0.1"
+      source  = "registry.terraform.io/fujitsu/irmc-redfish"
     }
   }
 }
