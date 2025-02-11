@@ -86,10 +86,13 @@ func (d *BiosDataSource) Configure(ctx context.Context, req datasource.Configure
 
 func (d *BiosDataSource) Read(ctx context.Context, req datasource.ReadRequest, resp *datasource.ReadResponse) {
 	// Read Terraform configuration data into the model
+
+	tflog.Info(ctx, "data-source-bios: read starts")
+
 	var data models.BiosDataSourceModel
 	resp.Diagnostics.Append(req.Config.Get(ctx, &data)...)
 	if resp.Diagnostics.HasError() {
-		tflog.Trace(ctx, "has error!")
+		tflog.Error(ctx, "has error!")
 		return
 	}
 
@@ -108,4 +111,6 @@ func (d *BiosDataSource) Read(ctx context.Context, req datasource.ReadRequest, r
 
 	// Save data into Terraform state
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
+
+	tflog.Info(ctx, "data-source-bios: read ends")
 }

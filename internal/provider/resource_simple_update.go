@@ -51,9 +51,16 @@ type SimpleUpdateResource struct {
 	p *IrmcProvider
 }
 
-const SIMPLE_UPDATE_ENDPOINT = "/redfish/v1/UpdateService/Actions/UpdateService.SimpleUpdate"
-const UPDATE_SERVICE_ENDPOINT = "/redfish/v1/UpdateService"
-const SIMPLE_UPDATE_TIMEOUT = 3000
+const (
+	SIMPLE_UPDATE_ENDPOINT   = "/redfish/v1/UpdateService/Actions/UpdateService.SimpleUpdate"
+	UPDATE_SERVICE_ENDPOINT  = "/redfish/v1/UpdateService"
+	SIMPLE_UPDATE_TIMEOUT    = 3000
+	PROTOCOL_HTTP            = "http"
+	PROTOCOL_HTTPS           = "https"
+	PROTOCOL_FTP             = "ftp"
+	OPERATION_TIME_IMMEDIATE = "Immediate"
+	OPERATION_TIME_ON_RESET  = "OnReset"
+)
 
 func (r *SimpleUpdateResource) Metadata(ctx context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
 	resp.TypeName = req.ProviderTypeName + simpleUpdate
@@ -74,7 +81,10 @@ func (r *SimpleUpdateResource) Schema(ctx context.Context, req resource.SchemaRe
 				Description:         "Protocol for the update. Supported values: http, https, ftp.",
 				Required:            true,
 				Validators: []validator.String{
-					stringvalidator.OneOf("http", "https", "ftp"),
+					stringvalidator.OneOf(
+						PROTOCOL_HTTP,
+						PROTOCOL_HTTPS,
+						PROTOCOL_FTP),
 				},
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.RequiresReplace(),
@@ -93,11 +103,11 @@ func (r *SimpleUpdateResource) Schema(ctx context.Context, req resource.SchemaRe
 				Description:         "Time to apply the update. Supported values: Immediate, OnReset.",
 				Optional:            true,
 				Computed:            true,
-				Default:             stringdefault.StaticString("Immediate"),
+				Default:             stringdefault.StaticString(OPERATION_TIME_IMMEDIATE),
 				Validators: []validator.String{
 					stringvalidator.OneOf([]string{
-						"Immediate",
-						"OnReset",
+						OPERATION_TIME_IMMEDIATE,
+						OPERATION_TIME_ON_RESET,
 					}...),
 				},
 				PlanModifiers: []planmodifier.String{

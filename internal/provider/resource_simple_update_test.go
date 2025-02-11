@@ -26,18 +26,22 @@ import (
 	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
 )
 
-const simpleUpdateResourceName = "irmc-redfish_simple_update.simple_update"
+const (
+	simpleUpdateResourceName = "irmc-redfish_simple_update.simple_update"
+	TRANSFER_PROTOCOL        = "http"
+	APPLY_TIME               = "Immediate"
+)
 
 func TestAccSimpleUpdateResource_correct(t *testing.T) {
 	resource.Test(t, resource.TestCase{
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		Steps: []resource.TestStep{
 			{
-				Config: testAccSimpleUpdateResourceConfig(creds, "http", os.Getenv("TF_TESTING_SIMPLE_UPDATE_IMAGE_URL"), "Immediate"),
+				Config: testAccSimpleUpdateResourceConfig(creds, TRANSFER_PROTOCOL, os.Getenv("TF_TESTING_SIMPLE_UPDATE_IMAGE_URL"), APPLY_TIME),
 				Check: resource.ComposeAggregateTestCheckFunc(
-					resource.TestCheckResourceAttr(simpleUpdateResourceName, "transfer_protocol", "http"),
+					resource.TestCheckResourceAttr(simpleUpdateResourceName, "transfer_protocol", TRANSFER_PROTOCOL),
 					resource.TestCheckResourceAttr(simpleUpdateResourceName, "update_image", os.Getenv("TF_TESTING_SIMPLE_UPDATE_IMAGE_URL")),
-					resource.TestCheckResourceAttr(simpleUpdateResourceName, "operation_apply_time", "Immediate"),
+					resource.TestCheckResourceAttr(simpleUpdateResourceName, "operation_apply_time", APPLY_TIME),
 				),
 			},
 		},
@@ -49,7 +53,7 @@ func TestAccSimpleUpdateResource_invalidTransferProtocol(t *testing.T) {
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		Steps: []resource.TestStep{
 			{
-				Config:      testAccSimpleUpdateResourceConfig(creds, "sftp", os.Getenv("TF_TESTING_SIMPLE_UPDATE_IMAGE_URL"), "Immediate"),
+				Config:      testAccSimpleUpdateResourceConfig(creds, "sftp", os.Getenv("TF_TESTING_SIMPLE_UPDATE_IMAGE_URL"), APPLY_TIME),
 				ExpectError: regexp.MustCompile("Invalid Attribute Value Match"),
 			},
 		},
@@ -61,7 +65,7 @@ func TestAccSimpleUpdateResource_missingImage(t *testing.T) {
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		Steps: []resource.TestStep{
 			{
-				Config:      testAccSimpleUpdateResourceConfig(creds, "http", "", "Immediate"),
+				Config:      testAccSimpleUpdateResourceConfig(creds, TRANSFER_PROTOCOL, "", APPLY_TIME),
 				ExpectError: regexp.MustCompile("Simple Update task did not complete successfully"),
 			},
 		},
@@ -73,7 +77,7 @@ func TestAccSimpleUpdateResource_invalidApplyTime(t *testing.T) {
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		Steps: []resource.TestStep{
 			{
-				Config:      testAccSimpleUpdateResourceConfig(creds, "http", os.Getenv("TF_TESTING_SIMPLE_UPDATE_IMAGE_URL"), "InvalidTime"),
+				Config:      testAccSimpleUpdateResourceConfig(creds, TRANSFER_PROTOCOL, os.Getenv("TF_TESTING_SIMPLE_UPDATE_IMAGE_URL"), "InvalidTime"),
 				ExpectError: regexp.MustCompile("Invalid Attribute Value Match"),
 			},
 		},

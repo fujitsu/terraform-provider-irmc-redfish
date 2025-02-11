@@ -20,6 +20,7 @@ package provider
 import (
 	"context"
 	"fmt"
+	"net/http"
 	"terraform-provider-irmc-redfish/internal/models"
 	"time"
 
@@ -186,7 +187,7 @@ func (r *PowerResource) Create(ctx context.Context, req resource.CreateRequest, 
 		}
 		defer respPost.Body.Close()
 
-		if respPost.StatusCode != 204 {
+		if respPost.StatusCode != http.StatusNoContent {
 			resp.Diagnostics.AddError("PowerCycle POST request failed - ", fmt.Sprintf("Received status code: %d", respPost.StatusCode))
 			return
 		}
@@ -242,6 +243,8 @@ func (r *PowerResource) Read(ctx context.Context, req resource.ReadRequest, resp
 		return
 	}
 
+	defer config.Logout()
+
 	system, err := GetSystemResource(config.Service)
 	if err != nil {
 		resp.Diagnostics.AddError("system error", err.Error())
@@ -267,27 +270,13 @@ func (r *PowerResource) Read(ctx context.Context, req resource.ReadRequest, resp
 // Update updates the resource and sets the updated Terraform state on success.
 func (r *PowerResource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
 	// Get state Data
+
 	tflog.Info(ctx, "resource-power: update starts")
-	var state, plan models.PowerResourceModel
-	diags := req.State.Get(ctx, &state)
-	resp.Diagnostics.Append(diags...)
-	if resp.Diagnostics.HasError() {
-		return
-	}
-
-	// Get plan Data
-	diags = req.Plan.Get(ctx, &plan)
-	resp.Diagnostics.Append(diags...)
-	if resp.Diagnostics.HasError() {
-		return
-	}
-
-	state.MaxWaitTime = plan.MaxWaitTime
-	state.RedfishServer = plan.RedfishServer
-	tflog.Trace(ctx, "resource-power: update - state update finished")
-	// Save into State
-	diags = resp.State.Set(ctx, &state)
-	resp.Diagnostics.Append(diags...)
+	// This function should not be called since updates are not supported; the resource should be recreated instead.
+	resp.Diagnostics.AddError(
+		"Unsupported Update Operation for IRMC Power",
+		"The IRMC Power resource does not support in-place updates. It is intended to be destroyed and recreated if changes are required.",
+	)
 	tflog.Info(ctx, "resource-power: update ends")
 }
 

@@ -52,7 +52,7 @@ func getSystemStorageFromSerialNumber(service *gofish.Service, serial string) (*
 		}
 	}
 
-	return nil, fmt.Errorf("Storage controller represented by serial has not been found on list of controllers for the target system.")
+	return nil, fmt.Errorf("storage controller represented by serial has not been found on list of controllers for the target system")
 }
 
 type storageControllerOem struct {
@@ -524,7 +524,7 @@ func waitUntilStorageChangesApplied(ctx context.Context, service *gofish.Service
 		// TODO: no support for task approach
 
 		if time.Now().Unix()-startTime > timeout {
-			return false, fmt.Errorf("Timeout of %d s has been reached", timeout)
+			return false, fmt.Errorf("timeout of %d s has been reached", timeout)
 		}
 
 		time.Sleep(5 * time.Second)

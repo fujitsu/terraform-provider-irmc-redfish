@@ -156,50 +156,6 @@ func (r *BootSourceOverrideResource) Configure(ctx context.Context, req resource
 	r.p = p
 }
 
-type bootConfig struct {
-	BootDevice          string `json:"BootDevice"`
-	NextBootOnlyEnabled bool   `json:"NextBootOnlyEnabled"`
-	Etag                string `json:"@odata.etag"`
-}
-
-func bootSourceOverrideApply(api *gofish.APIClient, plan *models.BootSourceOverrideResourceModel) error {
-	resp, err := api.Get(BOOT_CONFIG_OEM_ENDPOINT)
-	if err != nil {
-		return fmt.Errorf("GET on /BootConfig finished with error '%w'", err)
-	}
-
-	if resp.StatusCode != http.StatusOK {
-		return fmt.Errorf("GET on /BootConfig finished with status code %d", resp.StatusCode)
-	}
-
-	bodyBytes, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return fmt.Errorf("Error during read of /BootConfig GET response body '%w'", err)
-	}
-
-	resp.Body.Close()
-	var config bootConfig
-	if err = json.Unmarshal(bodyBytes, &config); err != nil {
-		return fmt.Errorf("Error during unmarshal of /BootConfig GET response '%w'", err)
-	}
-
-	config.BootDevice = plan.BootSourceOverrideTarget.ValueString()
-	if plan.BootSourceOverrideEnabled.ValueString() == "Once" {
-		config.NextBootOnlyEnabled = true
-	} else {
-		config.NextBootOnlyEnabled = false
-	}
-
-	headers := map[string]string{HTTP_HEADER_IF_MATCH: config.Etag}
-	resp, err = api.PatchWithHeaders(BOOT_CONFIG_OEM_ENDPOINT, config, headers)
-	if err != nil {
-		return fmt.Errorf("Error during Patch of /BootConfig '%s'", err.Error())
-	}
-
-	resp.Body.Close()
-	return nil
-}
-
 func (r *BootSourceOverrideResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
 	tflog.Info(ctx, "resource-boot_source_override: create starts")
 
@@ -265,4 +221,48 @@ func (r *BootSourceOverrideResource) Delete(ctx context.Context, req resource.De
 	tflog.Info(ctx, "resource-boot_source_override: delete starts")
 	resp.State.RemoveResource(ctx)
 	tflog.Info(ctx, "resource-boot_source_override: delete ends")
+}
+
+type bootConfig struct {
+	BootDevice          string `json:"BootDevice"`
+	NextBootOnlyEnabled bool   `json:"NextBootOnlyEnabled"`
+	Etag                string `json:"@odata.etag"`
+}
+
+func bootSourceOverrideApply(api *gofish.APIClient, plan *models.BootSourceOverrideResourceModel) error {
+	resp, err := api.Get(BOOT_CONFIG_OEM_ENDPOINT)
+	if err != nil {
+		return fmt.Errorf("GET on /BootConfig finished with error '%w'", err)
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("GET on /BootConfig finished with status code %d", resp.StatusCode)
+	}
+
+	bodyBytes, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return fmt.Errorf("error during read of /BootConfig GET response body '%w'", err)
+	}
+
+	resp.Body.Close()
+	var config bootConfig
+	if err = json.Unmarshal(bodyBytes, &config); err != nil {
+		return fmt.Errorf("error during unmarshal of /BootConfig GET response '%w'", err)
+	}
+
+	config.BootDevice = plan.BootSourceOverrideTarget.ValueString()
+	if plan.BootSourceOverrideEnabled.ValueString() == "Once" {
+		config.NextBootOnlyEnabled = true
+	} else {
+		config.NextBootOnlyEnabled = false
+	}
+
+	headers := map[string]string{HTTP_HEADER_IF_MATCH: config.Etag}
+	resp, err = api.PatchWithHeaders(BOOT_CONFIG_OEM_ENDPOINT, config, headers)
+	if err != nil {
+		return fmt.Errorf("error during Patch of /BootConfig '%s'", err.Error())
+	}
+
+	resp.Body.Close()
+	return nil
 }

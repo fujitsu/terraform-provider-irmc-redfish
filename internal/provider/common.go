@@ -214,7 +214,7 @@ func GetSystemResource(service *gofish.Service) (*redfish.ComputerSystem, error)
 		}
 	}
 
-	return nil, fmt.Errorf("Requested System resource has not been found on list")
+	return nil, fmt.Errorf("requested System resource has not been found on list")
 }
 
 func difference(a, b []string) []string {
@@ -244,7 +244,7 @@ func retryConnectWithTimeout(ctx context.Context, pconfig *IrmcProvider, rserver
 			return apiClient, nil
 		}
 
-		tflog.Warn(ctx, fmt.Sprintf("Failed to connect to the IRMC system: %s. Retrying in 30 seconds...", err.Error()))
+		tflog.Warn(ctx, fmt.Sprintf("failed to connect to the IRMC system: %s. Retrying in 30 seconds...", err.Error()))
 		time.Sleep(30 * time.Second)
 	}
 

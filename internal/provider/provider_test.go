@@ -22,6 +22,7 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"net/http"
 	"os"
 	"testing"
 	"time"
@@ -92,9 +93,12 @@ func testAccPrepareVMediaSlots(creds TestingServerCredentials) {
 		return
 	}
 
-	if resp.StatusCode == 200 {
+	defer resp.Body.Close()
+
+	if resp.StatusCode == http.StatusOK {
 		bodyBytes, err := io.ReadAll(resp.Body)
 		if err != nil {
+			log.Printf("Error reading response body: %s", err.Error())
 			return
 		}
 
@@ -117,7 +121,7 @@ func testAccPrepareVMediaSlots(creds TestingServerCredentials) {
 				return
 			}
 
-			if resp.StatusCode == 200 {
+			if resp.StatusCode == http.StatusOK {
 				log.Print("Vmedia slot number settings changed successfully, 10s timeout will follow now")
 				time.Sleep(10 * time.Second)
 			}

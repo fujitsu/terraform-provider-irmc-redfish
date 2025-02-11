@@ -102,6 +102,7 @@ func (d *IrmcSystemBootDataSource) Configure(ctx context.Context, req datasource
 }
 
 func (d *IrmcSystemBootDataSource) Read(ctx context.Context, req datasource.ReadRequest, resp *datasource.ReadResponse) {
+	tflog.Info(ctx, "data-system-boot: read starts")
 
 	var data models.SystemBootDataSource
 	diags := req.Config.Get(ctx, &data)
@@ -162,4 +163,6 @@ func (d *IrmcSystemBootDataSource) Read(ctx context.Context, req datasource.Read
 
 	diags = resp.State.Set(ctx, &data)
 	resp.Diagnostics.Append(diags...)
+
+	tflog.Info(ctx, "data-system-boot: read ends")
 }
