@@ -19,6 +19,7 @@ package provider
 
 import (
 	"fmt"
+	"os"
 	"regexp"
 	"testing"
 
@@ -27,9 +28,7 @@ import (
 )
 
 const (
-	working_cdimage_path = "http://10.172.181.125:8006/gauge/vmedia/Cd!123.iso"
-	working_hdimage_path = "http://10.172.181.125:8006/gauge/vmedia/Hd!123.img"
-	resource_name        = "irmc-redfish_virtual_media.vm"
+	resource_name = "irmc-redfish_virtual_media.vm"
 )
 
 func getVMediaImportConfiguration(creds TestingServerCredentials) (string, error) {
@@ -49,26 +48,17 @@ func getVMediaImportConfigurationInvalidId(creds TestingServerCredentials) (stri
 		creds.Username, creds.Password, creds.Endpoint), nil
 }
 
-func TestAccRedfishVirtualMedia_basic_cd(t *testing.T) {
+func TestAccRedfishVirtualMedia_basic_cd_nfs(t *testing.T) {
 	resource.Test(t, resource.TestCase{
 		PreCheck:                 func() { testAccPrepareVMediaSlots(creds) },
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		Steps: []resource.TestStep{
 			{
 				Config: testAccRedfishResourceVirtualMediaConfig(
-					creds, "10.172.181.125/gauge/vmedia/Cd!123.iso", "NFS",
+					creds, os.Getenv("TF_TESTING_VMEDIA_CD_PATH_NFS"), "NFS",
 				),
 				Check: resource.ComposeAggregateTestCheckFunc(
-					resource.TestCheckResourceAttr(resource_name, "image", "10.172.181.125/gauge/vmedia/Cd!123.iso"),
-					resource.TestCheckResourceAttr(resource_name, "inserted", "true"),
-				),
-			},
-			{
-				Config: testAccRedfishResourceVirtualMediaConfig(
-					creds, working_cdimage_path, "HTTP",
-				),
-				Check: resource.ComposeAggregateTestCheckFunc(
-					resource.TestCheckResourceAttr(resource_name, "image", working_cdimage_path),
+					resource.TestCheckResourceAttr(resource_name, "image", os.Getenv("TF_TESTING_VMEDIA_CD_PATH_NFS")),
 					resource.TestCheckResourceAttr(resource_name, "inserted", "true"),
 				),
 			},
@@ -93,6 +83,42 @@ func TestAccRedfishVirtualMedia_basic_cd(t *testing.T) {
 	})
 }
 
+func TestAccRedfishVirtualMedia_basic_cd_cifs(t *testing.T) {
+	resource.Test(t, resource.TestCase{
+		PreCheck:                 func() { testAccPrepareVMediaSlots(creds) },
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		Steps: []resource.TestStep{
+			{
+				Config: testAccRedfishResourceVirtualMediaConfig(
+					creds, os.Getenv("TF_TESTING_VMEDIA_CD_PATH_CIFS"), "CIFS",
+				),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttr(resource_name, "image", os.Getenv("TF_TESTING_VMEDIA_CD_PATH_CIFS")),
+					resource.TestCheckResourceAttr(resource_name, "inserted", "true"),
+				),
+			},
+		},
+	})
+}
+
+func TestAccRedfishVirtualMedia_basic_cd_https(t *testing.T) {
+	resource.Test(t, resource.TestCase{
+		PreCheck:                 func() { testAccPrepareVMediaSlots(creds) },
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		Steps: []resource.TestStep{
+			{
+				Config: testAccRedfishResourceVirtualMediaConfig(
+					creds, os.Getenv("TF_TESTING_VMEDIA_CD_PATH_HTTPS"), "HTTPS",
+				),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttr(resource_name, "image", os.Getenv("TF_TESTING_VMEDIA_CD_PATH_HTTPS")),
+					resource.TestCheckResourceAttr(resource_name, "inserted", "true"),
+				),
+			},
+		},
+	})
+}
+
 func TestAccRedfishVirtualMedia_basic_hd(t *testing.T) {
 	resource.Test(t, resource.TestCase{
 		PreCheck:                 func() { testAccPrepareVMediaSlots(creds) },
@@ -100,10 +126,10 @@ func TestAccRedfishVirtualMedia_basic_hd(t *testing.T) {
 		Steps: []resource.TestStep{
 			{
 				Config: testAccRedfishResourceVirtualMediaConfig(
-					creds, working_hdimage_path, "HTTP",
+					creds, os.Getenv("TF_TESTING_VMEDIA_HD_PATH_NFS"), "NFS",
 				),
 				Check: resource.ComposeAggregateTestCheckFunc(
-					resource.TestCheckResourceAttr(resource_name, "image", working_hdimage_path),
+					resource.TestCheckResourceAttr(resource_name, "image", os.Getenv("TF_TESTING_VMEDIA_HD_PATH_NFS")),
 					resource.TestCheckResourceAttr(resource_name, "inserted", "true"),
 				),
 			},
@@ -126,13 +152,13 @@ func TestAccRedfishVirtualMedia_NotAllowedExtension(t *testing.T) {
 		Steps: []resource.TestStep{
 			{
 				Config: testAccRedfishResourceVirtualMediaConfig(
-					creds, "http://10.172.181.125:8006/gauge/vmedia/Cd!123.iso2", "HTTP",
+					creds, "https://10.172.181.125:8006/gauge/vmedia/Cd!123.iso2", "HTTPS",
 				),
 				ExpectError: regexp.MustCompile("Image type format is not supported"),
 			},
 			{
 				Config: testAccRedfishResourceVirtualMediaConfig(
-					creds, "http://10.172.181.125:8006/gauge/vmedia/Hd!123.ima", "HTTP",
+					creds, "https://10.172.181.125:8006/gauge/vmedia/Hd!123.ima", "HTTPS",
 				),
 				ExpectError: regexp.MustCompile("Image type format is not supported"),
 			},
