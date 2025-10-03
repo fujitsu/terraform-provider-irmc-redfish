@@ -75,11 +75,12 @@ func waitUntilHostStateChanged(service *gofish.Service, expectedPoweredOn bool, 
 }
 
 type tsBiosObject struct {
-	IsBiosInPOSTPhase bool `json:"IsBiosInPostPhase"`
+	IsBiosInPOST *bool `json:"IsBiosInPostPhase,omitempty"`
 }
 
 type biosOemObject struct {
-	Ts_fujitsu tsBiosObject `json:"ts_fujitsu"`
+	OemFujitsu tsBiosObject `json:"ts_fujitsu"`
+	OemFsas    tsBiosObject `json:"Fsas"`
 }
 
 type biosObject struct {
@@ -111,7 +112,15 @@ func isBiosInPOSTPhase(service *gofish.Service) (bool, error) {
 		return false, err
 	}
 
-	return config.Oem.Ts_fujitsu.IsBiosInPOSTPhase, nil
+	if config.Oem.OemFujitsu.IsBiosInPOST != nil {
+		return *config.Oem.OemFujitsu.IsBiosInPOST, nil
+	} else {
+		if config.Oem.OemFsas.IsBiosInPOST != nil {
+			return *config.Oem.OemFsas.IsBiosInPOST, nil
+		} else {
+			return false, fmt.Errorf("could not find IsBiosInPostPhase object")
+		}
+	}
 }
 
 // waitUntilHostStateChangedEnhanced waits until host will change its state
