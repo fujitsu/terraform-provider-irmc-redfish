@@ -42,16 +42,19 @@ import (
 )
 
 const (
-	FIRMWARE_UPDATE_ENDPOINT             = "/redfish/v1/Managers/iRMC/Oem/ts_fujitsu/iRMCConfiguration/FWUpdate"
-	FILE_FIRMWARE_UPDATE_ENDPOINT        = "/redfish/v1/Managers/iRMC/Actions/Oem/FTSManager.FWUpdate"
-	TFTP_FIRMWARE_UPDATE_ENDPOINT        = "/redfish/v1/Managers/iRMC/Actions/Oem/FTSManager.FWTFTPUpdate"
-	MEMORY_CARD_FIRMWARE_UPDATE_ENDPOINT = "/redfish/v1/Managers/iRMC/Actions/Oem/FTSManager.FWMemoryCardUpdate"
-	FIRMWARE_UPDATE_TIMEOUT              = 3000
-	UPDATE_TYPE                          = "update_type"
-	UPDATE_TYPE_FILE                     = "File"
-	UPDATE_TYPE_TFTP                     = "TFTP"
-	UPDATE_TYPE_MEMORY_CARD              = "MemoryCard"
+	FIRMWARE_UPDATE_TIMEOUT = 3000
+	UPDATE_TYPE             = "update_type"
+	UPDATE_TYPE_FILE        = "File"
+	UPDATE_TYPE_TFTP        = "TFTP"
+	UPDATE_TYPE_MEMORY_CARD = "MemoryCard"
 )
+
+type firmwareUpdateEndpoints struct {
+	FirmwareUpdateEndpoint           string
+	FileFirmwareUpdateEndpoint       string
+	TftpFirmwareUpdateEndpoint       string
+	MemoryCardFirmwareUpdateEndpoint string
+}
 
 // Ensure provider defined types fully satisfy framework interfaces.
 var _ resource.Resource = &IrmcFirmwareUpdateResource{}
@@ -197,7 +200,15 @@ func (r *IrmcFirmwareUpdateResource) Create(ctx context.Context, req resource.Cr
 	}
 	defer api.Logout()
 
-	err = setSelectors(api, &plan)
+	isFsas, err := IsFsasCheck(ctx, api)
+	if err != nil {
+		resp.Diagnostics.AddError("Vendor Detection Failed", err.Error())
+		return
+	}
+
+	firmwareUpdEnpd := getFirmwareEndpoints(isFsas)
+
+	err = setSelectors(api, &plan, firmwareUpdEnpd.FirmwareUpdateEndpoint)
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to set iRMC Selectors", err.Error())
 		return
@@ -206,7 +217,7 @@ func (r *IrmcFirmwareUpdateResource) Create(ctx context.Context, req resource.Cr
 	// Handle firmware update based on the update type.
 	switch plan.UpdateType.ValueString() {
 	case UPDATE_TYPE_FILE:
-		taskLocation, err := handleFileUpdate(api, &plan)
+		taskLocation, err := handleFileUpdate(api, &plan, firmwareUpdEnpd.FileFirmwareUpdateEndpoint)
 		if err != nil {
 			resp.Diagnostics.AddError("File firmware update failed.", err.Error())
 			return
@@ -217,7 +228,7 @@ func (r *IrmcFirmwareUpdateResource) Create(ctx context.Context, req resource.Cr
 			return
 		}
 	case UPDATE_TYPE_TFTP:
-		taskLocation, err := handleTftpUpdate(api, &plan)
+		taskLocation, err := handleTftpUpdate(api, &plan, firmwareUpdEnpd.FirmwareUpdateEndpoint, firmwareUpdEnpd.TftpFirmwareUpdateEndpoint)
 		if err != nil {
 			resp.Diagnostics.AddError("TFTP firmware update failed.", err.Error())
 			return
@@ -228,7 +239,7 @@ func (r *IrmcFirmwareUpdateResource) Create(ctx context.Context, req resource.Cr
 			return
 		}
 	case UPDATE_TYPE_MEMORY_CARD:
-		taskLocation, err := handleMemoryCardUpdate(api)
+		taskLocation, err := handleMemoryCardUpdate(api, firmwareUpdEnpd.MemoryCardFirmwareUpdateEndpoint)
 		if err != nil {
 			resp.Diagnostics.AddError("MemoryCard firmware update failed.", err.Error())
 			return
@@ -246,7 +257,7 @@ func (r *IrmcFirmwareUpdateResource) Create(ctx context.Context, req resource.Cr
 		return
 	}
 
-	plan.Id = types.StringValue(FIRMWARE_UPDATE_ENDPOINT)
+	plan.Id = types.StringValue(firmwareUpdEnpd.FirmwareUpdateEndpoint)
 
 	diags = resp.State.Set(ctx, &plan)
 	resp.Diagnostics.Append(diags...)
@@ -291,9 +302,9 @@ func (r *IrmcFirmwareUpdateResource) Delete(ctx context.Context, req resource.De
 	tflog.Info(ctx, "resource-irmc-redfish_irmc_firmware_update: delete ends")
 }
 
-func handleTftpUpdate(api *gofish.APIClient, plan *models.IrmcFirmwareUpdateResourceModel) (string, error) {
+func handleTftpUpdate(api *gofish.APIClient, plan *models.IrmcFirmwareUpdateResourceModel, firmwareUpdateEndpoint, tftpFirmwareUpdateEndpoint string) (string, error) {
 
-	res, err := api.Get(FIRMWARE_UPDATE_ENDPOINT)
+	res, err := api.Get(firmwareUpdateEndpoint)
 	if err != nil {
 		return "", fmt.Errorf("failed to fetch data from Redfish endpoint: %v", err)
 	}
@@ -304,7 +315,7 @@ func handleTftpUpdate(api *gofish.APIClient, plan *models.IrmcFirmwareUpdateReso
 		"iRMCFileName": plan.TftpUpdateFile.ValueString(),
 	}
 
-	res, err = api.PatchWithHeaders(FIRMWARE_UPDATE_ENDPOINT, payload,
+	res, err = api.PatchWithHeaders(firmwareUpdateEndpoint, payload,
 		map[string]string{HTTP_HEADER_IF_MATCH: res.Header.Get(HTTP_HEADER_ETAG)})
 	if err != nil {
 		return "", fmt.Errorf("failed to send PATCH request: %v", err)
@@ -316,7 +327,7 @@ func handleTftpUpdate(api *gofish.APIClient, plan *models.IrmcFirmwareUpdateReso
 	}
 
 	updatePayload := map[string]interface{}{}
-	res, err = api.Post(TFTP_FIRMWARE_UPDATE_ENDPOINT, updatePayload)
+	res, err = api.Post(tftpFirmwareUpdateEndpoint, updatePayload)
 	if err != nil {
 		return "", fmt.Errorf("failed to send POST request: %v", err)
 	}
@@ -333,11 +344,11 @@ func handleTftpUpdate(api *gofish.APIClient, plan *models.IrmcFirmwareUpdateReso
 	return taskLocation, nil
 }
 
-func handleMemoryCardUpdate(api *gofish.APIClient) (string, error) {
+func handleMemoryCardUpdate(api *gofish.APIClient, memoryCardFirmwareUpdateEndpoint string) (string, error) {
 
 	payload := map[string]interface{}{}
 
-	res, err := api.Post(MEMORY_CARD_FIRMWARE_UPDATE_ENDPOINT, payload)
+	res, err := api.Post(memoryCardFirmwareUpdateEndpoint, payload)
 	if err != nil {
 		return "", fmt.Errorf("failed to send POST request: %v", err)
 	}
@@ -353,7 +364,7 @@ func handleMemoryCardUpdate(api *gofish.APIClient) (string, error) {
 	return taskLocation, nil
 }
 
-func handleFileUpdate(api *gofish.APIClient, plan *models.IrmcFirmwareUpdateResourceModel) (string, error) {
+func handleFileUpdate(api *gofish.APIClient, plan *models.IrmcFirmwareUpdateResourceModel, fileFirmwareUpdateEndpoint string) (string, error) {
 	if plan.IRMCPathToBinary.IsNull() {
 		return "", fmt.Errorf("missing firmware file name in the configuration")
 	}
@@ -363,7 +374,7 @@ func handleFileUpdate(api *gofish.APIClient, plan *models.IrmcFirmwareUpdateReso
 		return "", fmt.Errorf("error reading firmware file: %w", err)
 	}
 
-	taskLocation, err := sendFileFirmwareUpdate(api, fileData)
+	taskLocation, err := sendFileFirmwareUpdate(api, fileData, fileFirmwareUpdateEndpoint)
 	if err != nil {
 		return "", fmt.Errorf("error sending firmware update: %w", err)
 	}
@@ -389,13 +400,13 @@ func readFirmwareFile(filePath string) (*os.File, error) {
 	return data, nil
 }
 
-func sendFileFirmwareUpdate(api *gofish.APIClient, fileData *os.File) (string, error) {
+func sendFileFirmwareUpdate(api *gofish.APIClient, fileData *os.File, fileFirmwareUpdateEndpoint string) (string, error) {
 
 	payload := map[string]io.Reader{
 		"data": fileData,
 	}
 
-	resp, err := api.Service.GetClient().PostMultipart(FILE_FIRMWARE_UPDATE_ENDPOINT, payload)
+	resp, err := api.Service.GetClient().PostMultipart(fileFirmwareUpdateEndpoint, payload)
 	if err != nil {
 		return "", fmt.Errorf("error sending firmware update: %w", err)
 	}
@@ -417,9 +428,9 @@ func sendFileFirmwareUpdate(api *gofish.APIClient, fileData *os.File) (string, e
 	return taskLocation, nil
 }
 
-func setSelectors(api *gofish.APIClient, plan *models.IrmcFirmwareUpdateResourceModel) error {
+func setSelectors(api *gofish.APIClient, plan *models.IrmcFirmwareUpdateResourceModel, firmwareUpdateEndpoint string) error {
 
-	res, err := api.Get(FIRMWARE_UPDATE_ENDPOINT)
+	res, err := api.Get(firmwareUpdateEndpoint)
 	if err != nil {
 		return fmt.Errorf("failed to fetch data from Redfish endpoint: %w", err)
 	}
@@ -430,7 +441,7 @@ func setSelectors(api *gofish.APIClient, plan *models.IrmcFirmwareUpdateResource
 		"iRMCFlashSelector": plan.IRMCFlashSelector.ValueString(),
 	}
 
-	res, err = api.PatchWithHeaders(FIRMWARE_UPDATE_ENDPOINT, payload, map[string]string{
+	res, err = api.PatchWithHeaders(firmwareUpdateEndpoint, payload, map[string]string{
 		HTTP_HEADER_IF_MATCH: res.Header.Get(HTTP_HEADER_ETAG),
 	})
 	if err != nil {
@@ -489,4 +500,22 @@ func ResetIrmcAfterFirmwareUpd(ctx context.Context, api *gofish.APIClient, plan 
 	}
 
 	return nil
+}
+
+func getFirmwareEndpoints(isFsas bool) firmwareUpdateEndpoints {
+	var oemPath, managerAction string
+	if isFsas {
+		oemPath = "Fsas"
+		managerAction = "Fsas"
+	} else {
+		oemPath = "ts_fujitsu"
+		managerAction = "FTS"
+	}
+
+	return firmwareUpdateEndpoints{
+		FirmwareUpdateEndpoint:           fmt.Sprintf("/redfish/v1/Managers/iRMC/Oem/%s/iRMCConfiguration/FWUpdate", oemPath),
+		FileFirmwareUpdateEndpoint:       fmt.Sprintf("/redfish/v1/Managers/iRMC/Actions/Oem/%sManager.FWUpdate", managerAction),
+		TftpFirmwareUpdateEndpoint:       fmt.Sprintf("/redfish/v1/Managers/iRMC/Actions/Oem/%sManager.FWTFTPUpdate", managerAction),
+		MemoryCardFirmwareUpdateEndpoint: fmt.Sprintf("/redfish/v1/Managers/iRMC/Actions/Oem/%sManager.FWMemoryCardUpdate", managerAction),
+	}
 }

@@ -19,6 +19,7 @@ package provider
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"terraform-provider-irmc-redfish/internal/models"
@@ -273,4 +274,25 @@ func restartIrmc(ctx context.Context, api *gofish.APIClient, RedfishServer []mod
 	}
 
 	return nil
+}
+
+func IsFsasCheck(ctx context.Context, api *gofish.APIClient) (bool, error) {
+	res, err := api.Get("/redfish/v1/")
+	if err != nil {
+		return false, fmt.Errorf("failed to retrieve /redfish/v1/ endpoint: %w", err)
+	}
+	defer res.Body.Close()
+
+	var serviceRoot map[string]interface{}
+	if err := json.NewDecoder(res.Body).Decode(&serviceRoot); err != nil {
+		return false, fmt.Errorf("failed to parse response from /redfish/v1/: %w", err)
+	}
+
+	if oem, ok := serviceRoot["Oem"].(map[string]interface{}); ok {
+		if _, ok := oem["Fsas"]; ok {
+			return true, nil
+		}
+	}
+
+	return false, nil
 }
