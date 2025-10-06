@@ -35,11 +35,11 @@ import (
 	"github.com/stmcginnis/gofish"
 )
 
-const (
-	UPLOAD_CERT_ENDPOINT = "/redfish/v1/Managers/iRMC/Oem/ts_fujitsu/iRMCConfiguration/Certificates/Actions/FTSCertificates.UploadSSLCertOrKey"
-	VERIFY_CERT_ENDPOINT = "/redfish/v1/Managers/iRMC/Oem/ts_fujitsu/iRMCConfiguration/Certificates/Actions/FTSCertificates.VerifySSLCertKeyCompliance"
-	CERT_ENDPOINT        = "/redfish/v1/Managers/iRMC/Oem/ts_fujitsu/iRMCConfiguration/Certificates"
-)
+type certificateWebServerEndpoints struct {
+	uploadCertEndpoint string
+	verifyCertEndpoint string
+	certEndpoint       string
+}
 
 // Ensure provider defined types fully satisfy framework interfaces.
 var _ resource.Resource = &IrmcCertificateWebServerResource{}
@@ -133,19 +133,27 @@ func (r *IrmcCertificateWebServerResource) Create(ctx context.Context, req resou
 	}
 	defer api.Logout()
 
-	err = sendCertificateUpdate(api, plan.CertPublicKey.ValueString())
+	isFsas, err := IsFsasCheck(ctx, api)
+	if err != nil {
+		resp.Diagnostics.AddError("Vendor Detection Failed", err.Error())
+		return
+	}
+
+	certWebServerEndp := getCertificateWebServerEndpoints(isFsas)
+
+	err = sendCertificateUpdate(api, plan.CertPublicKey.ValueString(), certWebServerEndp.uploadCertEndpoint)
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to upload public certificate", err.Error())
 		return
 	}
 
-	err = sendCertificateUpdate(api, plan.CertPrivateKey.ValueString())
+	err = sendCertificateUpdate(api, plan.CertPrivateKey.ValueString(), certWebServerEndp.uploadCertEndpoint)
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to upload private key", err.Error())
 		return
 	}
 
-	err = verifyCertificateCompliance(api)
+	err = verifyCertificateCompliance(api, certWebServerEndp.verifyCertEndpoint)
 	if err != nil {
 		resp.Diagnostics.AddError("Certificate verification failed", err.Error())
 		return
@@ -157,7 +165,7 @@ func (r *IrmcCertificateWebServerResource) Create(ctx context.Context, req resou
 		return
 	}
 
-	plan.Id = types.StringValue(CERT_ENDPOINT)
+	plan.Id = types.StringValue(certWebServerEndp.certEndpoint)
 	diags = resp.State.Set(ctx, &plan)
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
@@ -201,7 +209,7 @@ func (r *IrmcCertificateWebServerResource) Delete(ctx context.Context, req resou
 	tflog.Info(ctx, "resource-certificate-web-server: delete ends")
 }
 
-func sendCertificateUpdate(api *gofish.APIClient, filePath string) error {
+func sendCertificateUpdate(api *gofish.APIClient, filePath, uploadCertEndpoint string) error {
 	file, err := os.Open(filePath)
 	if err != nil {
 		return fmt.Errorf("unable to open file %s: %w", filePath, err)
@@ -212,7 +220,7 @@ func sendCertificateUpdate(api *gofish.APIClient, filePath string) error {
 		"data": file,
 	}
 
-	resp, err := api.Service.GetClient().PostMultipart(UPLOAD_CERT_ENDPOINT, payload)
+	resp, err := api.Service.GetClient().PostMultipart(uploadCertEndpoint, payload)
 	if err != nil {
 		return fmt.Errorf("error sending certificate update: %w", err)
 	}
@@ -226,8 +234,8 @@ func sendCertificateUpdate(api *gofish.APIClient, filePath string) error {
 	return nil
 }
 
-func verifyCertificateCompliance(api *gofish.APIClient) error {
-	resp, err := api.Service.GetClient().Post(VERIFY_CERT_ENDPOINT, nil)
+func verifyCertificateCompliance(api *gofish.APIClient, verifyCertEndpoint string) error {
+	resp, err := api.Service.GetClient().Post(verifyCertEndpoint, nil)
 	if err != nil {
 		return fmt.Errorf("error sending POST request: %w", err)
 	}
@@ -252,4 +260,20 @@ func verifyCertificateCompliance(api *gofish.APIClient) error {
 	}
 
 	return nil
+}
+
+func getCertificateWebServerEndpoints(isFsas bool) certificateWebServerEndpoints {
+	if isFsas {
+		return certificateWebServerEndpoints{
+			certEndpoint:       fmt.Sprintf("/redfish/v1/Managers/iRMC/Oem/%s/iRMCConfiguration/Certificates", FSAS),
+			uploadCertEndpoint: fmt.Sprintf("/redfish/v1/Managers/iRMC/Oem/%s/iRMCConfiguration/Certificates/Actions/%sCertificates.UploadSSLCertOrKey", FSAS, FSAS),
+			verifyCertEndpoint: fmt.Sprintf("/redfish/v1/Managers/iRMC/Oem/%s/iRMCConfiguration/Certificates/Actions/%sCertificates.VerifySSLCertKeyCompliance", FSAS, FSAS),
+		}
+	} else {
+		return certificateWebServerEndpoints{
+			certEndpoint:       fmt.Sprintf("/redfish/v1/Managers/iRMC/Oem/%s/iRMCConfiguration/Certificates", TS_FUJITSU),
+			uploadCertEndpoint: fmt.Sprintf("/redfish/v1/Managers/iRMC/Oem/%s/iRMCConfiguration/Certificates/Actions/%sCertificates.UploadSSLCertOrKey", TS_FUJITSU, FTS),
+			verifyCertEndpoint: fmt.Sprintf("/redfish/v1/Managers/iRMC/Oem/%s/iRMCConfiguration/Certificates/Actions/%sCertificates.VerifySSLCertKeyCompliance", TS_FUJITSU, FTS),
+		}
+	}
 }

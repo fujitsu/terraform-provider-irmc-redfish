@@ -503,19 +503,20 @@ func ResetIrmcAfterFirmwareUpd(ctx context.Context, api *gofish.APIClient, plan 
 }
 
 func getFirmwareEndpoints(isFsas bool) firmwareUpdateEndpoints {
-	var oemPath, managerAction string
 	if isFsas {
-		oemPath = "Fsas"
-		managerAction = "Fsas"
+		return firmwareUpdateEndpoints{
+			FirmwareUpdateEndpoint:           fmt.Sprintf("/redfish/v1/Managers/iRMC/Oem/%s/iRMCConfiguration/FWUpdate", FSAS),
+			FileFirmwareUpdateEndpoint:       fmt.Sprintf("/redfish/v1/Managers/iRMC/Actions/Oem/%sManager.FWUpdate", FSAS),
+			TftpFirmwareUpdateEndpoint:       fmt.Sprintf("/redfish/v1/Managers/iRMC/Actions/Oem/%sManager.FWTFTPUpdate", FSAS),
+			MemoryCardFirmwareUpdateEndpoint: fmt.Sprintf("/redfish/v1/Managers/iRMC/Actions/Oem/%sManager.FWMemoryCardUpdate", FSAS),
+		}
 	} else {
-		oemPath = "ts_fujitsu"
-		managerAction = "FTS"
+		return firmwareUpdateEndpoints{
+			FirmwareUpdateEndpoint:           fmt.Sprintf("/redfish/v1/Managers/iRMC/Oem/%s/iRMCConfiguration/FWUpdate", TS_FUJITSU),
+			FileFirmwareUpdateEndpoint:       fmt.Sprintf("/redfish/v1/Managers/iRMC/Actions/Oem/%sManager.FWUpdate", FTS),
+			TftpFirmwareUpdateEndpoint:       fmt.Sprintf("/redfish/v1/Managers/iRMC/Actions/Oem/%sManager.FWTFTPUpdate", FTS),
+			MemoryCardFirmwareUpdateEndpoint: fmt.Sprintf("/redfish/v1/Managers/iRMC/Actions/Oem/%sManager.FWMemoryCardUpdate", FTS),
+		}
 	}
 
-	return firmwareUpdateEndpoints{
-		FirmwareUpdateEndpoint:           fmt.Sprintf("/redfish/v1/Managers/iRMC/Oem/%s/iRMCConfiguration/FWUpdate", oemPath),
-		FileFirmwareUpdateEndpoint:       fmt.Sprintf("/redfish/v1/Managers/iRMC/Actions/Oem/%sManager.FWUpdate", managerAction),
-		TftpFirmwareUpdateEndpoint:       fmt.Sprintf("/redfish/v1/Managers/iRMC/Actions/Oem/%sManager.FWTFTPUpdate", managerAction),
-		MemoryCardFirmwareUpdateEndpoint: fmt.Sprintf("/redfish/v1/Managers/iRMC/Actions/Oem/%sManager.FWMemoryCardUpdate", managerAction),
-	}
 }

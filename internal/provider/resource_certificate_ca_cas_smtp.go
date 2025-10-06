@@ -34,10 +34,11 @@ import (
 	"github.com/stmcginnis/gofish"
 )
 
-const (
-	CERTIFICATE_CA_CAS_CMTP_ENDPOINT        = "/redfish/v1/Managers/iRMC/Oem/ts_fujitsu/iRMCConfiguration/Certificates"
-	CERTIFICATE_CA_CAS_CMTP_UPLOAD_ENDPOINT = "/redfish/v1/Managers/iRMC/Oem/ts_fujitsu/iRMCConfiguration/Certificates/Actions/FTSCertificates.UploadCACertificate"
-)
+type certificateEndpoints struct {
+	certificateCaCasCmtpEndpoint       string
+	certificateCaCasCmtpUploadEndpoint string
+	certEndpoint                       string
+}
 
 // Ensure provider defined types fully satisfy framework interfaces.
 var _ resource.Resource = &IrmcCertificateCaCasSmtpResource{}
@@ -123,13 +124,21 @@ func (r *IrmcCertificateCaCasSmtpResource) Create(ctx context.Context, req resou
 	}
 	defer api.Logout()
 
-	err = caCertificateUpload(api, &plan)
+	isFsas, err := IsFsasCheck(ctx, api)
+	if err != nil {
+		resp.Diagnostics.AddError("Vendor Detection Failed", err.Error())
+		return
+	}
+
+	certsEndp := getCertificateEndpoints(isFsas)
+
+	err = caCertificateUpload(api, &plan, certsEndp.certificateCaCasCmtpEndpoint, certsEndp.certificateCaCasCmtpUploadEndpoint)
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to upload public certificate", err.Error())
 		return
 	}
 
-	plan.Id = types.StringValue(CERT_ENDPOINT)
+	plan.Id = types.StringValue(certsEndp.certEndpoint)
 	diags = resp.State.Set(ctx, &plan)
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
@@ -173,7 +182,7 @@ func (r *IrmcCertificateCaCasSmtpResource) Delete(ctx context.Context, req resou
 	tflog.Info(ctx, "resource-certificate-ca-cas-smtp: delete ends")
 }
 
-func caCertificateUpload(api *gofish.APIClient, plan *models.CertificateCaCasSmtpResourceModel) error {
+func caCertificateUpload(api *gofish.APIClient, plan *models.CertificateCaCasSmtpResourceModel, certificateCaCasCmtpEndpoint, certificateCaCasCmtpUploadEndpoint string) error {
 	file, err := os.Open(plan.CertificateCaFile.ValueString())
 	if err != nil {
 		return fmt.Errorf("unable to open file %s: %w", plan.CertificateCaFile.ValueString(), err)
@@ -184,7 +193,7 @@ func caCertificateUpload(api *gofish.APIClient, plan *models.CertificateCaCasSmt
 		"data": file,
 	}
 
-	resp, err := api.Service.GetClient().PostMultipart(CERTIFICATE_CA_CAS_CMTP_UPLOAD_ENDPOINT, payload)
+	resp, err := api.Service.GetClient().PostMultipart(certificateCaCasCmtpUploadEndpoint, payload)
 	if err != nil {
 		return fmt.Errorf("error sending certificate upload: %w", err)
 	}
@@ -195,6 +204,22 @@ func caCertificateUpload(api *gofish.APIClient, plan *models.CertificateCaCasSmt
 		return fmt.Errorf("failed to upload certificate, status: %d, response: %s", resp.StatusCode, string(body))
 	}
 
-	plan.Id = types.StringValue(CERTIFICATE_CA_CAS_CMTP_ENDPOINT)
+	plan.Id = types.StringValue(certificateCaCasCmtpEndpoint)
 	return nil
+}
+
+func getCertificateEndpoints(isFsas bool) certificateEndpoints {
+	if isFsas {
+		return certificateEndpoints{
+			certificateCaCasCmtpEndpoint:       fmt.Sprintf("/redfish/v1/Managers/iRMC/Oem/%s/iRMCConfiguration/Certificates", FSAS),
+			certificateCaCasCmtpUploadEndpoint: fmt.Sprintf("/redfish/v1/Managers/iRMC/Oem/%s/iRMCConfiguration/Certificates/Actions/%sCertificates.UploadCACertificate", FSAS, FSAS),
+			certEndpoint:                       fmt.Sprintf("/redfish/v1/Managers/iRMC/Oem/%s/iRMCConfiguration/Certificates", FSAS),
+		}
+	} else {
+		return certificateEndpoints{
+			certificateCaCasCmtpEndpoint:       fmt.Sprintf("/redfish/v1/Managers/iRMC/Oem/%s/iRMCConfiguration/Certificates", TS_FUJITSU),
+			certificateCaCasCmtpUploadEndpoint: fmt.Sprintf("/redfish/v1/Managers/iRMC/Oem/%s/iRMCConfiguration/Certificates/Actions/%sCertificates.UploadCACertificate", TS_FUJITSU, FTS),
+			certEndpoint:                       fmt.Sprintf("/redfish/v1/Managers/iRMC/Oem/%s/iRMCConfiguration/Certificates", TS_FUJITSU),
+		}
+	}
 }

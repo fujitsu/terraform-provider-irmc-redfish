@@ -58,6 +58,9 @@ const (
 	HTTP_HEADER_IF_MATCH = "If-Match"
 	HTTP_HEADER_ETAG     = "ETag"
 	HTTP_HEADER_LOCATION = "Location"
+	FSAS                 = "Fsas"
+	TS_FUJITSU           = "ts_fujitsu"
+	FTS                  = "FTS"
 )
 
 type ServerConfig struct {
