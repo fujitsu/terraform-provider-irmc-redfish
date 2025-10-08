@@ -61,8 +61,14 @@ func IsTaskFinishedSuccessfully(state redfish.TaskState) bool {
 // FetchRedfishTaskLog tries to fetch logs of task pointed by location
 // from system accessed by service. If logs content could not be accessed
 // diags is filled with reason.
-func FetchRedfishTaskLog(service *gofish.Service, location string) (logs []byte, diags diag.Diagnostics) {
-	task_log_endpoint := location + "/Oem/ts_fujitsu/Logs"
+func FetchRedfishTaskLog(service *gofish.Service, location string, is_fsas bool) (logs []byte, diags diag.Diagnostics) {
+	task_log_endpoint := location
+	if is_fsas {
+		task_log_endpoint += "/Oem/Fsas/Logs"
+	} else {
+		task_log_endpoint += "/Oem/ts_fujitsu/Logs"
+	}
+
 	res, err := service.GetClient().Get(task_log_endpoint)
 	if err != nil {
 		diags.AddError("Error while reading task log endpoint", err.Error())
