@@ -222,7 +222,7 @@ func (r *IrmcFirmwareUpdateResource) Create(ctx context.Context, req resource.Cr
 			resp.Diagnostics.AddError("File firmware update failed.", err.Error())
 			return
 		}
-		err = checkFirmwareUpdateStatus(ctx, api.Service, taskLocation, plan.UpdateTimeout.ValueInt64())
+		err = checkFirmwareUpdateStatus(ctx, api.Service, taskLocation, plan.UpdateTimeout.ValueInt64(), isFsas)
 		if err != nil {
 			resp.Diagnostics.AddError("File Firmware Update task did not complete successfully", err.Error())
 			return
@@ -233,7 +233,7 @@ func (r *IrmcFirmwareUpdateResource) Create(ctx context.Context, req resource.Cr
 			resp.Diagnostics.AddError("TFTP firmware update failed.", err.Error())
 			return
 		}
-		err = checkFirmwareUpdateStatus(ctx, api.Service, taskLocation, plan.UpdateTimeout.ValueInt64())
+		err = checkFirmwareUpdateStatus(ctx, api.Service, taskLocation, plan.UpdateTimeout.ValueInt64(), isFsas)
 		if err != nil {
 			resp.Diagnostics.AddError("TFTP Firmware Update task did not complete successfully", err.Error())
 			return
@@ -244,7 +244,7 @@ func (r *IrmcFirmwareUpdateResource) Create(ctx context.Context, req resource.Cr
 			resp.Diagnostics.AddError("MemoryCard firmware update failed.", err.Error())
 			return
 		}
-		err = checkFirmwareUpdateStatus(ctx, api.Service, taskLocation, plan.UpdateTimeout.ValueInt64())
+		err = checkFirmwareUpdateStatus(ctx, api.Service, taskLocation, plan.UpdateTimeout.ValueInt64(), isFsas)
 		if err != nil {
 			resp.Diagnostics.AddError("Memory Card Firmware Update task did not complete successfully", err.Error())
 			return
@@ -460,10 +460,10 @@ func setSelectors(api *gofish.APIClient, plan *models.IrmcFirmwareUpdateResource
 	return nil
 }
 
-func checkFirmwareUpdateStatus(ctx context.Context, service *gofish.Service, location string, timeout int64) error {
+func checkFirmwareUpdateStatus(ctx context.Context, service *gofish.Service, location string, timeout int64, isFsas bool) error {
 	finishedSuccessfully, err := WaitForRedfishTaskEnd(ctx, service, location, timeout)
 	if err != nil || !finishedSuccessfully {
-		taskLog, diags := FetchRedfishTaskLog(service, location)
+		taskLog, diags := FetchRedfishTaskLog(service, location, isFsas)
 		if diags.HasError() {
 			return fmt.Errorf("firmware Update task did not complete successfully: %s", err)
 		}

@@ -42,9 +42,9 @@ import (
 	"github.com/stmcginnis/gofish/redfish"
 )
 
-const (
-	BOOT_CONFIG_OEM_ENDPOINT = "/redfish/v1/Systems/0/Oem/ts_fujitsu/BootConfig"
-)
+type bootSourceOverrideEndpoints struct {
+	bootConfigOemEndpoint string
+}
 
 // Ensure provider defined types fully satisfy framework interfaces.
 var _ resource.Resource = &BootSourceOverrideResource{}
@@ -182,7 +182,15 @@ func (r *BootSourceOverrideResource) Create(ctx context.Context, req resource.Cr
 
 	defer api.Logout()
 
-	err = bootSourceOverrideApply(api, &plan)
+	isFsas, err := IsFsasCheck(ctx, api)
+	if err != nil {
+		resp.Diagnostics.AddError("Vendor Detection Failed", err.Error())
+		return
+	}
+
+	endp := getBootSourceOverrideEndpoints(isFsas)
+
+	err = bootSourceOverrideApply(api, &plan, endp.bootConfigOemEndpoint)
 	if err != nil {
 		resp.Diagnostics.AddError("Error reported by apply procedure %s", err.Error())
 		return
@@ -196,7 +204,7 @@ func (r *BootSourceOverrideResource) Create(ctx context.Context, req resource.Cr
 		return
 	}
 
-	plan.Id = types.StringValue(BOOT_CONFIG_OEM_ENDPOINT)
+	plan.Id = types.StringValue(endp.bootConfigOemEndpoint)
 
 	diags = resp.State.Set(ctx, &plan)
 	resp.Diagnostics.Append(diags...)
@@ -229,8 +237,8 @@ type bootConfig struct {
 	Etag                string `json:"@odata.etag"`
 }
 
-func bootSourceOverrideApply(api *gofish.APIClient, plan *models.BootSourceOverrideResourceModel) error {
-	resp, err := api.Get(BOOT_CONFIG_OEM_ENDPOINT)
+func bootSourceOverrideApply(api *gofish.APIClient, plan *models.BootSourceOverrideResourceModel, bootConfigOemEndpoint string) error {
+	resp, err := api.Get(bootConfigOemEndpoint)
 	if err != nil {
 		return fmt.Errorf("GET on /BootConfig finished with error '%w'", err)
 	}
@@ -258,11 +266,23 @@ func bootSourceOverrideApply(api *gofish.APIClient, plan *models.BootSourceOverr
 	}
 
 	headers := map[string]string{HTTP_HEADER_IF_MATCH: config.Etag}
-	resp, err = api.PatchWithHeaders(BOOT_CONFIG_OEM_ENDPOINT, config, headers)
+	resp, err = api.PatchWithHeaders(bootConfigOemEndpoint, config, headers)
 	if err != nil {
 		return fmt.Errorf("error during Patch of /BootConfig '%s'", err.Error())
 	}
 
 	resp.Body.Close()
 	return nil
+}
+
+func getBootSourceOverrideEndpoints(isFsas bool) bootSourceOverrideEndpoints {
+	if isFsas {
+		return bootSourceOverrideEndpoints{
+			bootConfigOemEndpoint: fmt.Sprintf("/redfish/v1/Systems/0/Oem/%s/BootConfig", FSAS),
+		}
+	} else {
+		return bootSourceOverrideEndpoints{
+			bootConfigOemEndpoint: fmt.Sprintf("/redfish/v1/Systems/0/Oem/%s/BootConfig", TS_FUJITSU),
+		}
+	}
 }

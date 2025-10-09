@@ -243,6 +243,13 @@ func (r *BiosResource) Update(ctx context.Context, req resource.UpdateRequest, r
 
 	defer api.Logout()
 
+	isFsas, err := IsFsasCheck(ctx, api)
+
+	if err != nil {
+		resp.Diagnostics.AddError("Vendor Detection Failed", err.Error())
+		return
+	}
+	endp := getIrmcAttributesEndpoints(isFsas)
 	var plannedAttributes map[string]string
 	diags = plan.Attributes.ElementsAs(ctx, &plannedAttributes, true)
 	resp.Diagnostics.Append(diags...)
@@ -250,7 +257,7 @@ func (r *BiosResource) Update(ctx context.Context, req resource.UpdateRequest, r
 		return
 	}
 
-	adjustedAttributes, diags := validateAndAdjustPlannedIrmcAttributes(ctx, api.Service, plannedAttributes)
+	adjustedAttributes, diags := validateAndAdjustPlannedIrmcAttributes(ctx, api.Service, plannedAttributes, endp.irmcAttributesSettingsEndpoint)
 	resp.Diagnostics.Append(diags...)
 	if diags.HasError() {
 		return

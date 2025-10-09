@@ -56,17 +56,6 @@ type raidCapabilitiesConfig struct {
 	} `json:"RAIDLevels"`
 }
 
-type tsVolumeObject struct {
-	InitMode       string `json:"InitMode"`
-	ReadMode       string `json:"ReadMode"`
-	WriteMode      string `json:"WriteMode"`
-	DriveCacheMode string `json:"DriveCacheMode"`
-}
-
-type volumeOemObject struct {
-	Ts_fujitsu tsVolumeObject `json:"ts_fujitsu"`
-}
-
 type physical_disk_group struct {
 	Group []string
 }
@@ -111,7 +100,7 @@ func getVolumesCollectionUrl(service *gofish.Service, serial string) (url string
 // what target controller reports as supported. If validation has been successful,
 // function returns slice of physical_disk_group.
 func validateRequestAgainstStorageControllerCapabilities(ctx context.Context, service *gofish.Service,
-	storage_id string, plan models.StorageVolumeResourceModel) ([]physical_disk_group, error) {
+	storage_id string, plan models.StorageVolumeResourceModel, isFsas bool) ([]physical_disk_group, error) {
 	physical_disk_groups := []physical_disk_group{}
 
 	storage, err := getSystemStorageFromSerialNumber(service, storage_id)
@@ -123,9 +112,9 @@ func validateRequestAgainstStorageControllerCapabilities(ctx context.Context, se
 	if err != nil {
 		return physical_disk_groups, fmt.Errorf("storage disk verification failed %s", err.Error())
 	}
-
+	endp := getStorageCommonEndpoints(isFsas)
 	// Obtain RAIDCapabilities for particular storage controller
-	raidc_endpoint := storage.ODataID + STORAGE_RAIDCAPABILITIES_SUFFIX
+	raidc_endpoint := storage.ODataID + endp.storageRaidCapabilitiesSuffix
 	var capabilities raidCapabilitiesConfig
 	capabilities, err = getSystemStorageOemRaidCapabilitiesResource(service, raidc_endpoint)
 	if err != nil {
@@ -393,7 +382,7 @@ func getRecentlyCreatedVolumeId(ids_after, ids_before []string) string {
 // requestVolumeCreationAndSuperviseTheProcess sends creation request and waits until created task
 // will finish.
 func requestVolumeCreationAndSuperviseTheProcess(ctx context.Context, service *gofish.Service,
-	volumes_collection_endpoint string, new_volume_payload map[string]interface{}, timeout int64) (diags diag.Diagnostics) {
+	volumes_collection_endpoint string, new_volume_payload map[string]interface{}, timeout int64, isFsas bool) (diags diag.Diagnostics) {
 	res, err := service.GetClient().Post(volumes_collection_endpoint, new_volume_payload)
 	if err != nil {
 		diags.AddError("Error while requesting POST on volume collection", err.Error())
@@ -407,7 +396,7 @@ func requestVolumeCreationAndSuperviseTheProcess(ctx context.Context, service *g
 		_, err := WaitForRedfishTaskEnd(ctx, service, task_location, timeout)
 		if err != nil {
 			diags.AddError("Task for volume creation reported error", err.Error())
-			logs, internal_diags := FetchRedfishTaskLog(service, task_location)
+			logs, internal_diags := FetchRedfishTaskLog(service, task_location, isFsas)
 			if logs == nil {
 				diags = append(diags, internal_diags...)
 			} else {
@@ -448,11 +437,11 @@ func updateVolumeODataId(validStorageEndpoint string, state *models.StorageVolum
 
 // requestAndSuperviseVolumeCreationProcess tries to create volume inside of service according to plan.
 func requestAndSuperviseVolumeCreationProcess(ctx context.Context, service *gofish.Service,
-	plan models.StorageVolumeResourceModel) (diags diag.Diagnostics) {
+	plan models.StorageVolumeResourceModel, isFsas bool) (diags diag.Diagnostics) {
 
 	storage_id := plan.StorageControllerSN.ValueString()
 
-	physical_disk_groups, err := validateRequestAgainstStorageControllerCapabilities(ctx, service, storage_id, plan)
+	physical_disk_groups, err := validateRequestAgainstStorageControllerCapabilities(ctx, service, storage_id, plan, isFsas)
 	if err != nil {
 		diags.AddError("Error during request validation", err.Error())
 		return diags
@@ -472,12 +461,12 @@ func requestAndSuperviseVolumeCreationProcess(ctx context.Context, service *gofi
 	})
 
 	return requestVolumeCreationAndSuperviseTheProcess(ctx, service, volumes_collection_endpoint, new_volume_payload,
-		plan.JobTimeout.ValueInt64())
+		plan.JobTimeout.ValueInt64(), isFsas)
 }
 
 // deleteStorageVolume tries to destroy volume_endpoint in service.
 func deleteStorageVolume(ctx context.Context, service *gofish.Service,
-	volume_endpoint string) diag.Diagnostics {
+	volume_endpoint string, isFsas bool) diag.Diagnostics {
 	var diags diag.Diagnostics
 
 	res, err := service.GetClient().Delete(volume_endpoint)
@@ -493,7 +482,7 @@ func deleteStorageVolume(ctx context.Context, service *gofish.Service,
 		_, err := WaitForRedfishTaskEnd(ctx, service, task_location, 300)
 		if err != nil {
 			diags.AddError("Task for volume deletion reported error", err.Error())
-			logs, internal_diags := FetchRedfishTaskLog(service, task_location)
+			logs, internal_diags := FetchRedfishTaskLog(service, task_location, isFsas)
 			if logs == nil {
 				diags = append(diags, internal_diags...)
 			} else {
@@ -543,7 +532,7 @@ func getStorageIdFromVolumeODataId(volumeOdataId string) string {
 
 // readStorageVolumeToState reads current volume configuration to terraform state.
 func readStorageVolumeToState(volume *redfish.Volume, storage_serial string,
-	state *models.StorageVolumeResourceModel) (diags diag.Diagnostics) {
+	state *models.StorageVolumeResourceModel, isFsas bool) (diags diag.Diagnostics) {
 
 	state.StorageControllerSN = types.StringValue(storage_serial)
 	state.VolumeName = types.StringValue(volume.Name)
@@ -554,21 +543,34 @@ func readStorageVolumeToState(volume *redfish.Volume, storage_serial string,
 	// Theoretically volume can be migrated to different RAID type
 	state.RaidType = types.StringValue(string(volume.RAIDType))
 
-	var volumeOem volumeOemObject
-	err := json.Unmarshal(volume.OEM, &volumeOem)
-	if err != nil {
+	var oemData map[string]interface{}
+	if err := json.Unmarshal(volume.OEM, &oemData); err != nil {
 		diags.AddError("Could not unmarshal volume resource OEM object", err.Error())
 		return diags
 	}
 
-	if state.ReadMode != nil {
-		state.ReadMode.Actual = types.StringValue(volumeOem.Ts_fujitsu.ReadMode)
+	var oemKey string
+	if isFsas {
+		oemKey = FSAS
+	} else {
+		oemKey = TS_FUJITSU
 	}
 
-	if state.WriteMode != nil {
-		state.WriteMode.Actual = types.StringValue(volumeOem.Ts_fujitsu.WriteMode)
+	if oemValues, ok := oemData[oemKey].(map[string]interface{}); ok {
+		if state.ReadMode != nil {
+			if val, ok := oemValues["ReadMode"].(string); ok {
+				state.ReadMode.Actual = types.StringValue(val)
+			}
+		}
+		if state.WriteMode != nil {
+			if val, ok := oemValues["WriteMode"].(string); ok {
+				state.WriteMode.Actual = types.StringValue(val)
+			}
+		}
+		if val, ok := oemValues["DriveCacheMode"].(string); ok {
+			state.DriveCacheMode = types.StringValue(val)
+		}
 	}
-	state.DriveCacheMode = types.StringValue(volumeOem.Ts_fujitsu.DriveCacheMode)
 
 	return diags
 }
@@ -578,7 +580,7 @@ func readStorageVolumeToState(volume *redfish.Volume, storage_serial string,
 // The loop has timeout defined by timeout_s when operation will terminate if there will be still
 // differences between plan and volume.
 func compareVolumePropertiesWithPlan(ctx context.Context, service *gofish.Service, volume_id string,
-	plan models.StorageVolumeResourceModel, timeout_s int64) (bool, error) {
+	plan models.StorageVolumeResourceModel, timeout_s int64, isFsas bool) (bool, error) {
 	start_time := time.Now().Unix()
 
 	nameVerified := true
@@ -601,10 +603,24 @@ func compareVolumePropertiesWithPlan(ctx context.Context, service *gofish.Servic
 			return false, err
 		}
 
-		var volumeOem volumeOemObject
-		err = json.Unmarshal(volume.OEM, &volumeOem)
+		var oemData map[string]interface{}
+		err = json.Unmarshal(volume.OEM, &oemData)
 		if err != nil {
 			return false, err
+		}
+
+		var oemKey string
+		if isFsas {
+			oemKey = FSAS
+		} else {
+			oemKey = TS_FUJITSU
+		}
+
+		var currentDriveCacheMode string
+		if oemValues, ok := oemData[oemKey].(map[string]interface{}); ok {
+			if val, ok := oemValues["DriveCacheMode"].(string); ok {
+				currentDriveCacheMode = val
+			}
 		}
 
 		if verifyVolumeName {
@@ -614,7 +630,7 @@ func compareVolumePropertiesWithPlan(ctx context.Context, service *gofish.Servic
 		}
 
 		if verifyDriveCacheMode {
-			if volumeOem.Ts_fujitsu.DriveCacheMode == plan.DriveCacheMode.ValueString() {
+			if currentDriveCacheMode == plan.DriveCacheMode.ValueString() {
 				driveCacheVerified = true
 			}
 		}
@@ -627,7 +643,7 @@ func compareVolumePropertiesWithPlan(ctx context.Context, service *gofish.Servic
 			map[string]interface{}{
 				"volume name (current)":      volume.Name,
 				"volume name (planned)":      plan.VolumeName.ValueString(),
-				"drive cache mode (current)": volumeOem.Ts_fujitsu.DriveCacheMode,
+				"drive cache mode (current)": currentDriveCacheMode,
 				"drive cache mode (planned)": plan.DriveCacheMode.ValueString(),
 			})
 
@@ -641,20 +657,30 @@ func compareVolumePropertiesWithPlan(ctx context.Context, service *gofish.Servic
 
 // updateStorageVolume applies change on volume properties and verifies if planned
 // changes are reflected by Redfish volume endpoint.
-func requestVolumeModificationAndSuperviseTheProcess(ctx context.Context, service *gofish.Service, state models.StorageVolumeResourceModel,
-	plan models.StorageVolumeResourceModel) (diags diag.Diagnostics) {
-	payload := map[string]map[string]map[string]string{
-		"Oem": {
-			"ts_fujitsu": {},
-		},
+func requestVolumeModificationAndSuperviseTheProcess(ctx context.Context, service *gofish.Service, state models.StorageVolumeResourceModel, plan models.StorageVolumeResourceModel, isFsas bool) (diags diag.Diagnostics) {
+	var oemKey string
+	if isFsas {
+		oemKey = FSAS
+	} else {
+		oemKey = TS_FUJITSU
 	}
 
+	oemPayload := make(map[string]string)
 	if !plan.DriveCacheMode.IsUnknown() {
-		payload["Oem"]["ts_fujitsu"]["DriveCacheMode"] = plan.DriveCacheMode.ValueString()
+		oemPayload["DriveCacheMode"] = plan.DriveCacheMode.ValueString()
+	}
+	if !plan.VolumeName.IsUnknown() {
+		oemPayload["Name"] = plan.VolumeName.ValueString()
 	}
 
-	if !plan.VolumeName.IsUnknown() {
-		payload["Oem"]["ts_fujitsu"]["Name"] = plan.VolumeName.ValueString()
+	if len(oemPayload) == 0 {
+		return diags
+	}
+
+	payload := map[string]interface{}{
+		"Oem": map[string]interface{}{
+			oemKey: oemPayload,
+		},
 	}
 
 	tflog.Info(ctx, "Volume change requested with payload", map[string]interface{}{
@@ -678,7 +704,7 @@ func requestVolumeModificationAndSuperviseTheProcess(ctx context.Context, servic
 		time.Sleep(5 * time.Second)
 
 		// since no task is created, logic needs to wait with timeout for resource update
-		_, err := compareVolumePropertiesWithPlan(ctx, service, volume_endpoint, plan, 60)
+		_, err := compareVolumePropertiesWithPlan(ctx, service, volume_endpoint, plan, 60, isFsas)
 		if err != nil {
 			diags.AddError("Failed to change parameters", err.Error())
 		}
@@ -723,14 +749,14 @@ func updateStorageVolumeState(plan models.StorageVolumeResourceModel, target_vol
 	return output
 }
 
-func createStorageVolume(ctx context.Context, service *gofish.Service, plan models.StorageVolumeResourceModel, state *models.StorageVolumeResourceModel) (removeResource bool, diags diag.Diagnostics) {
+func createStorageVolume(ctx context.Context, service *gofish.Service, plan models.StorageVolumeResourceModel, state *models.StorageVolumeResourceModel, isFsas bool) (removeResource bool, diags diag.Diagnostics) {
 	storage_id := plan.StorageControllerSN.ValueString()
 	volumes_ids_before, diags := getVolumesIdsList(service, storage_id)
 	if diags.HasError() {
 		return false, diags
 	}
 
-	diags = requestAndSuperviseVolumeCreationProcess(ctx, service, plan)
+	diags = requestAndSuperviseVolumeCreationProcess(ctx, service, plan, isFsas)
 	if diags.HasError() {
 		return false, diags
 	}
@@ -776,7 +802,7 @@ func createStorageVolume(ctx context.Context, service *gofish.Service, plan mode
 	}
 
 	diags = readStorageVolumeToState(volume, plan.StorageControllerSN.ValueString(),
-		&target_volume_state)
+		&target_volume_state, isFsas)
 
 	target_volume_state.JobTimeout = types.Int64Value(STORAGE_VOLUME_JOB_DEFAULT_TIMEOUT)
 	if !plan.JobTimeout.IsUnknown() {
@@ -788,8 +814,8 @@ func createStorageVolume(ctx context.Context, service *gofish.Service, plan mode
 	return false, diags
 }
 
-func updateStorageVolume(ctx context.Context, service *gofish.Service, plan models.StorageVolumeResourceModel, state *models.StorageVolumeResourceModel) (removeResource bool, diags diag.Diagnostics) {
-	diags = requestVolumeModificationAndSuperviseTheProcess(ctx, service, *state, plan)
+func updateStorageVolume(ctx context.Context, service *gofish.Service, plan models.StorageVolumeResourceModel, state *models.StorageVolumeResourceModel, isFsas bool) (removeResource bool, diags diag.Diagnostics) {
+	diags = requestVolumeModificationAndSuperviseTheProcess(ctx, service, *state, plan, isFsas)
 	if diags.HasError() {
 		return false, diags
 	}
@@ -807,7 +833,7 @@ func updateStorageVolume(ctx context.Context, service *gofish.Service, plan mode
 		}
 	}
 
-	diags = readStorageVolumeToState(volume, state.StorageControllerSN.ValueString(), state)
+	diags = readStorageVolumeToState(volume, state.StorageControllerSN.ValueString(), state, isFsas)
 	if diags.HasError() {
 		return false, diags
 	}

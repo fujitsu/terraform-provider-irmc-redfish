@@ -18,6 +18,7 @@ limitations under the License.
 package provider
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -179,7 +180,21 @@ func testChangeCasLoginUri(creds TestingServerCredentials, loginUri string) {
 		return
 	}
 
-	path := "/redfish/v1/Managers/iRMC/Oem/ts_fujitsu/iRMCConfiguration/Cas"
+	isFsas, err := IsFsasCheck(context.Background(), api)
+	if err != nil {
+		log.Printf("Vendor check reported error %s", err.Error())
+		return
+	}
+
+	var oemKey string
+	if isFsas {
+		oemKey = FSAS
+	} else {
+		oemKey = TS_FUJITSU
+	}
+
+	path := fmt.Sprintf("/redfish/v1/Managers/iRMC/Oem/%s/iRMCConfiguration/Cas", oemKey)
+
 	resp, err := api.Get(path)
 	if err != nil {
 		log.Printf("Get request failed: %s", err.Error())
