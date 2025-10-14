@@ -16,7 +16,7 @@ limitations under the License.
 
 # irmc-redfish_bios (Resource)
 
-The resource is used to control (read, modify or import) BIOS settings on Fujitsu server equipped with iRMC controller.
+The resource is used to control (read, modify or import) BIOS settings on Fsas server equipped with iRMC controller.
 
 
 ## Schema

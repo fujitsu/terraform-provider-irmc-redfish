@@ -304,7 +304,7 @@ func (r *StorageResource) Create(ctx context.Context, req resource.CreateRequest
 
 	defer api.Logout()
 
-	diags = applyStorageControllerProperties(ctx, api.Service, &plan)
+	diags = applyStorageControllerProperties(ctx, api, &plan)
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
 		return
@@ -379,7 +379,7 @@ func (r *StorageResource) Update(ctx context.Context, req resource.UpdateRequest
 
 	defer api.Logout()
 
-	diags = applyStorageControllerProperties(ctx, api.Service, &plan)
+	diags = applyStorageControllerProperties(ctx, api, &plan)
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
 		return

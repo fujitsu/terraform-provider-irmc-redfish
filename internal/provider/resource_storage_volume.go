@@ -52,14 +52,12 @@ type StorageVolumeResource struct {
 }
 
 const (
-	STORAGE_COLLECTION_ENDPOINT        = "/redfish/v1/Systems/0/Storage"
-	STORAGE_VOLUME_RESOURCE_NAME       = "resource-storage_volume"
-	STORAGE_VOLUME_JOB_DEFAULT_TIMEOUT = 300
+	STORAGE_COLLECTION_ENDPOINT          = "/redfish/v1/Systems/0/Storage"
+	STORAGE_RAIDCAPABILITIES_SUFFIX      = "/Oem/ts_fujitsu/RAIDCapabilities"
+	STORAGE_RAIDCAPABILITIES_FSAS_SUFFIX = "/Oem/Fsas/RAIDCapabilities"
+	STORAGE_VOLUME_RESOURCE_NAME         = "resource-storage_volume"
+	STORAGE_VOLUME_JOB_DEFAULT_TIMEOUT   = 300
 )
-
-type storageVolumeEndpoints struct {
-	storageRaidCapabilitiesSuffix string
-}
 
 func (r *StorageVolumeResource) Metadata(ctx context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
 	resp.TypeName = req.ProviderTypeName + storageVolumeName
@@ -286,14 +284,9 @@ func (r *StorageVolumeResource) Create(ctx context.Context, req resource.CreateR
 	}
 
 	defer api.Logout()
-	isFsas, err := IsFsasCheck(ctx, api)
 
-	if err != nil {
-		resp.Diagnostics.AddError("Vendor Detection Failed", err.Error())
-		return
-	}
 	var state models.StorageVolumeResourceModel
-	beRemoved, diags := createStorageVolume(ctx, api.Service, plan, &state, isFsas)
+	beRemoved, diags := createStorageVolume(ctx, api, plan, &state)
 	if beRemoved {
 		resp.State.RemoveResource(ctx)
 		return
@@ -330,13 +323,6 @@ func (r *StorageVolumeResource) Read(ctx context.Context, req resource.ReadReque
 
 	defer api.Logout()
 
-	isFsas, err := IsFsasCheck(ctx, api)
-
-	if err != nil {
-		resp.Diagnostics.AddError("Vendor Detection Failed", err.Error())
-		return
-	}
-
 	validStorageEndpoint, err := getValidStorageEndpointFromSerial(api.Service, state.StorageControllerSN.ValueString())
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to get valid storage id", err.Error())
@@ -362,7 +348,7 @@ func (r *StorageVolumeResource) Read(ctx context.Context, req resource.ReadReque
 		return
 	}
 
-	diags = readStorageVolumeToState(volume, state.StorageControllerSN.ValueString(), &state, isFsas)
+	diags = readStorageVolumeToState(volume, state.StorageControllerSN.ValueString(), &state)
 	resp.Diagnostics.Append(diags...)
 
 	if diags.HasError() {
@@ -407,14 +393,7 @@ func (r *StorageVolumeResource) Update(ctx context.Context, req resource.UpdateR
 
 	defer api.Logout()
 
-	isFsas, err := IsFsasCheck(ctx, api)
-
-	if err != nil {
-		resp.Diagnostics.AddError("Vendor Detection Failed", err.Error())
-		return
-	}
-
-	beRemoved, diags := updateStorageVolume(ctx, api.Service, plan, &state, isFsas)
+	beRemoved, diags := updateStorageVolume(ctx, api, plan, &state)
 	if beRemoved {
 		resp.State.RemoveResource(ctx)
 		return
@@ -456,15 +435,14 @@ func (r *StorageVolumeResource) Delete(ctx context.Context, req resource.DeleteR
 
 	defer api.Logout()
 
-	isFsas, err := IsFsasCheck(ctx, api)
-
+	is_fsas, err := IsFsasCheck(ctx, api)
 	if err != nil {
-		resp.Diagnostics.AddError("Vendor Detection Failed", err.Error())
+		resp.Diagnostics.AddError("Vendor detection failed: ", err.Error())
 		return
 	}
 
 	// Try to delete handled volume
-	diags = deleteStorageVolume(ctx, api.Service, state.Id.ValueString(), isFsas)
+	diags = deleteStorageVolume(ctx, api.Service, state.Id.ValueString(), is_fsas, state.JobTimeout.ValueInt64())
 	resp.Diagnostics.Append(diags...)
 
 	if diags.HasError() {
@@ -503,16 +481,4 @@ func (r *StorageVolumeResource) ImportState(ctx context.Context, req resource.Im
 	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("server"), []models.RedfishServer{server})...)
 
 	tflog.Info(ctx, "resource-storage-volume: import ends")
-}
-
-func getStorageCommonEndpoints(isFsas bool) storageVolumeEndpoints {
-	if isFsas {
-		return storageVolumeEndpoints{
-			storageRaidCapabilitiesSuffix: fmt.Sprintf("/Oem/%s/RAIDCapabilities", FSAS),
-		}
-	} else {
-		return storageVolumeEndpoints{
-			storageRaidCapabilitiesSuffix: fmt.Sprintf("/Oem/%s/RAIDCapabilities", TS_FUJITSU),
-		}
-	}
 }

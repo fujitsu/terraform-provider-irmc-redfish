@@ -10,6 +10,7 @@ RAID controller serial number can be obtained by reading property SerialNumber i
 
 Every RAID controller presents its capabilities (supported RAID types etc.) in the following resource:
 - /redfish/v1/Systems/0/Storage/<controllerId>/Oem/ts_fujitsu/RAIDCapabilities
+- /redfish/v1/Systems/0/Storage/<controllerId>/Oem/Fsas/RAIDCapabilities
 
 
 ## Schema
