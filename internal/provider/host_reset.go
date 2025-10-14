@@ -135,6 +135,9 @@ func waitUntilHostStateChangedEnhanced(service *gofish.Service, expectedPoweredO
 	for {
 		// wait until BIOS will report POST state
 		for {
+			if time.Now().Unix()-startTime > timeout {
+				return fmt.Errorf("operation not finished within given timeout %d (waiting for POST to start)", timeout)
+			}
 			biosDuringPOST, err := isBiosInPOSTPhase(service)
 			if err != nil {
 				return err
@@ -144,37 +147,55 @@ func waitUntilHostStateChangedEnhanced(service *gofish.Service, expectedPoweredO
 				break
 			} else {
 				time.Sleep(time.Second)
-
-				if time.Now().Unix()-startTime > timeout {
-					return fmt.Errorf("BIOS did not entered POST within given timeout %d", timeout)
-				}
 			}
 		}
 
 		// wait until BIOS will stop report POST state and host will be still on
 		for {
+			if time.Now().Unix()-startTime > timeout {
+				return fmt.Errorf("operation not finished within given timeout %d (waiting for POST to end)", timeout)
+			}
 			biosDuringPOST, err := isBiosInPOSTPhase(service)
 			if err != nil {
 				return err
 			}
 
 			if !biosDuringPOST {
-				isPoweredOn, err := isPoweredOn(service)
+				isSystemPoweredOn, err := isPoweredOn(service)
 				if err != nil {
 					return err
 				}
 
-				if isPoweredOn {
+				if isSystemPoweredOn {
 					return nil
 				} else {
-					return fmt.Errorf("BIOS exited POST but host powered off")
+					const restartWaitSeconds = 20
+					restartDeadline := time.Now().Unix() + restartWaitSeconds
+					didPowerOnInTime := false
+
+					for time.Now().Unix() < restartDeadline {
+						if time.Now().Unix()-startTime > timeout {
+							break
+						}
+						powerStateAfterPost, err := isPoweredOn(service)
+						if err != nil {
+							return err
+						}
+						if powerStateAfterPost {
+							didPowerOnInTime = true
+							break
+						}
+						time.Sleep(2 * time.Second)
+					}
+
+					if didPowerOnInTime {
+						break
+					} else {
+						return fmt.Errorf("BIOS exited POST but host powered off")
+					}
 				}
 			} else {
 				time.Sleep(2 * time.Second)
-			}
-
-			if time.Now().Unix()-startTime > timeout {
-				return fmt.Errorf("operation not finished within given timeout %d", timeout)
 			}
 		}
 	}
