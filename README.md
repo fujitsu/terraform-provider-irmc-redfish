@@ -14,9 +14,9 @@ See the License for the specific language governing permissions and
 limitations under the License.
 -->
 
-# Terraform Provider for iRMC Fujitsu Redfish API
+# Terraform Provider for iRMC FSAS Redfish API
 
-The Terraform provider allows control and management over Fujitsu servers equipped with iRMC.
+The Terraform provider allows control and management over Fsas servers equipped with iRMC.
 
 ## Table of contents
 * [License](#license)
