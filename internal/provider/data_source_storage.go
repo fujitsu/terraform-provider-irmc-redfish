@@ -117,10 +117,20 @@ func StorageDataSourceSchema() map[string]schema.Attribute {
 			MarkdownDescription: "Spindown hotspare enabled.",
 			Description:         "Spindown hotspare.",
 		},
+		"patrol_read_recovery_support": schema.BoolAttribute{
+			Computed:            true,
+			MarkdownDescription: "Patrol read recovery support enabled.",
+			Description:         "Patrol read recovery support enabled.",
+		},
 		"mdc_schedule_mode": schema.StringAttribute{
 			Computed:            true,
 			MarkdownDescription: "MDC schedule mode.",
 			Description:         "MDC schedule mode.",
+		},
+		"mdc_abort_on_error_enabled": schema.BoolAttribute{
+			Computed:            true,
+			MarkdownDescription: "MDC abort on error enabled.",
+			Description:         "MDC abort on error enabled.",
 		},
 		"coercion_mode": schema.StringAttribute{
 			Computed:            true,
