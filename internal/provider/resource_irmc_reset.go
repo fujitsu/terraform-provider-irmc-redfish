@@ -103,8 +103,8 @@ func (r *IrmcRestartResource) Create(ctx context.Context, req resource.CreateReq
 		return
 	}
 
-	var endpoint string = plan.RedfishServer[0].Endpoint.ValueString()
-	var resource_name string = "resource-irmc-reset"
+	var endpoint = plan.RedfishServer[0].Endpoint.ValueString()
+	var resource_name = "resource-irmc-reset"
 	mutexPool.Lock(ctx, endpoint, resource_name)
 	defer mutexPool.Unlock(ctx, endpoint, resource_name)
 

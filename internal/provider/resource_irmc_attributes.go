@@ -135,8 +135,8 @@ func (r *IrmcAttributesResource) Create(ctx context.Context, req resource.Create
 	}
 
 	// Provide synchronization
-	var endpoint string = plan.RedfishServer[0].Endpoint.ValueString()
-	var resource_name string = "resource-irmc-attributes"
+	var endpoint = plan.RedfishServer[0].Endpoint.ValueString()
+	var resource_name = "resource-irmc-attributes"
 	mutexPool.Lock(ctx, endpoint, resource_name)
 	defer mutexPool.Unlock(ctx, endpoint, resource_name)
 
@@ -373,7 +373,7 @@ func validateAndAdjustPlannedIrmcAttributes(ctx context.Context, service *gofish
 	for key, newVal := range plannedAttributes {
 		currVal, ok := currAttributes[key]
 		if !ok {
-			var msg string = fmt.Sprintf("Attribute '%s' is not supported by the system", key)
+			var msg = fmt.Sprintf("Attribute '%s' is not supported by the system", key)
 			diags.AddError("Not supported attribute", msg)
 			return adjustedAttributes, diags
 		}
@@ -383,7 +383,7 @@ func validateAndAdjustPlannedIrmcAttributes(ctx context.Context, service *gofish
 			// to be accepted by Redfish API and BIOS
 			newValInt, err := strconv.Atoi(newVal)
 			if err != nil {
-				var msg string = fmt.Sprintf("Attribute '%s' has type int in current Attributes, but new value conversion failed '%s'", key, err.Error())
+				var msg = fmt.Sprintf("Attribute '%s' has type int in current Attributes, but new value conversion failed '%s'", key, err.Error())
 				diags.AddError("Attribute type conversion error", msg)
 				return adjustedAttributes, diags
 			}
@@ -391,14 +391,14 @@ func validateAndAdjustPlannedIrmcAttributes(ctx context.Context, service *gofish
 			if currValInt-newValInt != 0 {
 				newAttributes[key] = newValInt
 			} else {
-				var log string = fmt.Sprintf("Planned attribute '%s' has same value as current one, so omit", key)
+				var log = fmt.Sprintf("Planned attribute '%s' has same value as current one, so omit", key)
 				tflog.Info(ctx, log)
 			}
 		} else {
 			if currVal != newVal {
 				newAttributes[key] = newVal
 			} else {
-				var log string = fmt.Sprintf("Planned attribute '%s' has same value as current one, so omit", key)
+				var log = fmt.Sprintf("Planned attribute '%s' has same value as current one, so omit", key)
 				tflog.Info(ctx, log)
 			}
 		}

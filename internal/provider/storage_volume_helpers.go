@@ -252,7 +252,7 @@ func verifyRequestedDisks(ctx context.Context, plan models.StorageVolumeResource
 
 		for _, disk := range disks_in_group {
 
-			var disk_found bool = false
+			var disk_found = false
 			for _, drive := range drives {
 				if len(drive.Location) == 0 {
 					continue

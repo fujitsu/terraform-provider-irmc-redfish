@@ -273,7 +273,7 @@ func (r *StorageVolumeResource) Create(ctx context.Context, req resource.CreateR
 	}
 
 	// Provide synchronization
-	var endpoint string = plan.RedfishServer[0].Endpoint.ValueString()
+	var endpoint = plan.RedfishServer[0].Endpoint.ValueString()
 	mutexPool.Lock(ctx, endpoint, STORAGE_VOLUME_RESOURCE_NAME)
 	defer mutexPool.Unlock(ctx, endpoint, STORAGE_VOLUME_RESOURCE_NAME)
 
@@ -380,7 +380,7 @@ func (r *StorageVolumeResource) Update(ctx context.Context, req resource.UpdateR
 	}
 
 	// Provide synchronization
-	var endpoint string = plan.RedfishServer[0].Endpoint.ValueString()
+	var endpoint = plan.RedfishServer[0].Endpoint.ValueString()
 	mutexPool.Lock(ctx, endpoint, STORAGE_VOLUME_RESOURCE_NAME)
 	defer mutexPool.Unlock(ctx, endpoint, STORAGE_VOLUME_RESOURCE_NAME)
 
@@ -422,7 +422,7 @@ func (r *StorageVolumeResource) Delete(ctx context.Context, req resource.DeleteR
 	}
 
 	// Provide synchronization
-	var endpoint string = state.RedfishServer[0].Endpoint.ValueString()
+	var endpoint = state.RedfishServer[0].Endpoint.ValueString()
 	mutexPool.Lock(ctx, endpoint, STORAGE_VOLUME_RESOURCE_NAME)
 	defer mutexPool.Unlock(ctx, endpoint, STORAGE_VOLUME_RESOURCE_NAME)
 

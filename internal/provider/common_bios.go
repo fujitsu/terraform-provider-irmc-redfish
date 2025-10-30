@@ -41,7 +41,7 @@ func waitTillBiosSettingsApplied(ctx context.Context, service *gofish.Service, t
 		return diags
 	}
 
-	var logMsg string = fmt.Sprintf("Process will wait with %d seconds timeout to finish", timeout)
+	var logMsg = fmt.Sprintf("Process will wait with %d seconds timeout to finish", timeout)
 	tflog.Info(ctx, logMsg)
 
 	startTime := time.Now().Unix()
@@ -77,7 +77,7 @@ func waitTillBiosSettingsApplied(ctx context.Context, service *gofish.Service, t
 		   it will contain all writable properties. It's not best mechanism, but the only one known as of now
 		*/
 		if numberOfKeysInMap > 5 {
-			var logMsg string = fmt.Sprintf("Number of keys %d", numberOfKeysInMap)
+			var logMsg = fmt.Sprintf("Number of keys %d", numberOfKeysInMap)
 			tflog.Info(ctx, logMsg)
 			break
 		}

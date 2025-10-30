@@ -254,11 +254,7 @@ func resetHost(service *gofish.Service, resetType redfish.ResetType, timeout int
 		return err
 	}
 
-	expectedTargetState := true
-	if resetType == redfish.GracefulShutdownResetType || resetType == redfish.PushPowerButtonResetType {
-		// Assumption: host is powered on if someone requested reset
-		expectedTargetState = false
-	}
+	expectedTargetState := resetType != redfish.GracefulShutdownResetType && resetType != redfish.PushPowerButtonResetType
 
 	err = waitUntilHostStateChangedEnhanced(service, expectedTargetState, timeout)
 	if err != nil {

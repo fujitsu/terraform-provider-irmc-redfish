@@ -121,8 +121,8 @@ func (r *IrmcCertificateWebServerResource) Create(ctx context.Context, req resou
 	}
 
 	// Provide synchronization
-	var endpoint string = plan.RedfishServer[0].Endpoint.ValueString()
-	var resource_name string = "certificate_web_server"
+	var endpoint = plan.RedfishServer[0].Endpoint.ValueString()
+	var resource_name = "certificate_web_server"
 	mutexPool.Lock(ctx, endpoint, resource_name)
 	defer mutexPool.Unlock(ctx, endpoint, resource_name)
 

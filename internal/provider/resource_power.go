@@ -148,8 +148,8 @@ func (r *PowerResource) Create(ctx context.Context, req resource.CreateRequest, 
 	}
 
 	// Provide synchronization
-	var endpoint string = powerPlan.RedfishServer[0].Endpoint.ValueString()
-	var resource_name string = "resource-power"
+	var endpoint = powerPlan.RedfishServer[0].Endpoint.ValueString()
+	var resource_name = "resource-power"
 	mutexPool.Lock(ctx, endpoint, resource_name)
 	defer mutexPool.Unlock(ctx, endpoint, resource_name)
 

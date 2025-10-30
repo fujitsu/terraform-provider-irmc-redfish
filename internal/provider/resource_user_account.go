@@ -265,8 +265,8 @@ func (r *IrmcUserAccountResource) Create(ctx context.Context, req resource.Creat
 	}
 
 	// Provide synchronization
-	var endpoint string = plan.RedfishServer[0].Endpoint.ValueString()
-	var resource_name string = "resource-user-account"
+	var endpoint = plan.RedfishServer[0].Endpoint.ValueString()
+	var resource_name = "resource-user-account"
 	mutexPool.Lock(ctx, endpoint, resource_name)
 	defer mutexPool.Unlock(ctx, endpoint, resource_name)
 
@@ -818,7 +818,8 @@ func InitializeUserAccountRedfishRequest(plan models.IrmcUserAccountResourceMode
 		},
 	}
 
-	if redfishMethod == Create {
+	switch redfishMethod {
+	case Create:
 		redfishRequest := map[string]interface{}{
 			"UserName": plan.UserUsername.ValueString(),
 			"Password": plan.UserPassword.ValueString(),
@@ -828,7 +829,7 @@ func InitializeUserAccountRedfishRequest(plan models.IrmcUserAccountResourceMode
 		}
 		return redfishRequest, nil
 
-	} else if redfishMethod == Update {
+	case Update:
 		redfishRequest := map[string]interface{}{
 			"UserName": plan.UserUsername.ValueString(),
 			"Enabled":  plan.UserEnabled.ValueBool(),

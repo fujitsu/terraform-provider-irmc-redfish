@@ -168,8 +168,8 @@ func (r *BootSourceOverrideResource) Create(ctx context.Context, req resource.Cr
 	}
 
 	// Provide synchronization
-	var endpoint string = plan.RedfishServer[0].Endpoint.ValueString()
-	var resource_name string = "resource-boot_source_override"
+	var endpoint = plan.RedfishServer[0].Endpoint.ValueString()
+	var resource_name = "resource-boot_source_override"
 	mutexPool.Lock(ctx, endpoint, resource_name)
 	defer mutexPool.Unlock(ctx, endpoint, resource_name)
 

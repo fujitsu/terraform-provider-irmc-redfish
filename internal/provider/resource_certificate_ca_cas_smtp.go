@@ -112,8 +112,8 @@ func (r *IrmcCertificateCaCasSmtpResource) Create(ctx context.Context, req resou
 	}
 
 	// Provide synchronization
-	var endpoint string = plan.RedfishServer[0].Endpoint.ValueString()
-	var resource_name string = "certificate_ca_cas_smtp"
+	var endpoint = plan.RedfishServer[0].Endpoint.ValueString()
+	var resource_name = "certificate_ca_cas_smtp"
 	mutexPool.Lock(ctx, endpoint, resource_name)
 	defer mutexPool.Unlock(ctx, endpoint, resource_name)
 
