@@ -41,7 +41,8 @@ func TestAccRedfishIrmcAttributes(t *testing.T) {
 				PreConfig: func() { testChangeCasLoginUri(creds, "abc/def") },
 				Config:    testAccRedfishResourceIrmcAttrConfig_correctAttributes(creds, "abc/def/ghi"),
 				Check: resource.ComposeAggregateTestCheckFunc(
-					resource.TestCheckResourceAttr(irmc_attributes_name, "id", IRMC_ATTRIBUTES_SETTINGS_ENDPOINT),
+					resource.TestMatchResourceAttr(irmc_attributes_name, "id",
+						regexp.MustCompile("redfish/v1/Managers/iRMC/Oem/(.+)/iRMCConfiguration/Attributes")),
 					resource.TestCheckResourceAttr(irmc_attributes_name, "attributes.BmcCasLoginUri", "abc/def/ghi"),
 				),
 			},
