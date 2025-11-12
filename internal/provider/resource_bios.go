@@ -326,13 +326,13 @@ func applyBiosAttributes(service *gofish.Service, adjustedAttributes map[string]
 		return diags
 	}
 
-	res.Body.Close()
+	defer CloseResource(res.Body)
 
 	payload := map[string]interface{}{
 		"Attributes": adjustedAttributes,
 	}
 
-	res, err = client.PatchWithHeaders(BIOS_SETTINGS_ENDPOINT, payload,
+	_, err = client.PatchWithHeaders(BIOS_SETTINGS_ENDPOINT, payload,
 		map[string]string{HTTP_HEADER_IF_MATCH: res.Header.Get(HTTP_HEADER_ETAG)})
 
 	if err != nil {
@@ -340,7 +340,6 @@ func applyBiosAttributes(service *gofish.Service, adjustedAttributes map[string]
 		return diags
 	}
 
-	res.Body.Close()
 	return diags
 }
 

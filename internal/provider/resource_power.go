@@ -204,7 +204,8 @@ func (r *PowerResource) Create(ctx context.Context, req resource.CreateRequest, 
 			resp.Diagnostics.AddError("PowerCycle POST request failed", err.Error())
 			return
 		}
-		defer respPost.Body.Close()
+
+		defer CloseResource(respPost.Body)
 
 		if respPost.StatusCode != http.StatusNoContent {
 			resp.Diagnostics.AddError("PowerCycle POST request failed - ", fmt.Sprintf("Received status code: %d", respPost.StatusCode))

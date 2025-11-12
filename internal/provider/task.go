@@ -75,7 +75,7 @@ func FetchRedfishTaskLog(service *gofish.Service, location string, is_fsas bool)
 		return nil, diags
 	}
 
-	defer res.Body.Close()
+	defer CloseResource(res.Body)
 
 	if res.StatusCode == http.StatusOK {
 		bodyBytes, err := io.ReadAll(res.Body)

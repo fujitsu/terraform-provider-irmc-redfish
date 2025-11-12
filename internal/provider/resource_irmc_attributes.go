@@ -333,7 +333,7 @@ func getIrmcAttributesResource(service *gofish.Service, endpointAttributes strin
 		return resource, fmt.Errorf("could not access iRMC attributes resource due to %s", err.Error())
 	}
 
-	defer res.Body.Close()
+	defer CloseResource(res.Body)
 
 	bodyBytes, err := io.ReadAll(res.Body)
 	if err != nil {
@@ -451,7 +451,8 @@ func applyIrmcAttributes(service *gofish.Service, attributes map[string]interfac
 		diags.AddError("Reading iRMCConfiguration/Attributes failed", err.Error())
 		return diags, ""
 	}
-	defer res.Body.Close()
+
+	CloseResource(res.Body)
 
 	payload := map[string]interface{}{
 		"Attributes": attributes,
@@ -464,7 +465,8 @@ func applyIrmcAttributes(service *gofish.Service, attributes map[string]interfac
 		diags.AddError("Changing iRMCConfiguration/Attributes failed", err.Error())
 		return diags, ""
 	}
-	defer res.Body.Close()
+
+	CloseResource(res.Body)
 
 	if res.StatusCode == http.StatusAccepted {
 		location = res.Header.Get(HTTP_HEADER_LOCATION)

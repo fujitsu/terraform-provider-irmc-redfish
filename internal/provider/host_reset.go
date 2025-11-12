@@ -95,7 +95,7 @@ func isBiosInPOSTPhase(service *gofish.Service) (bool, error) {
 		return false, err
 	}
 
-	defer res.Body.Close()
+	defer CloseResource(res.Body)
 
 	if res.StatusCode != http.StatusOK {
 		return false, fmt.Errorf("unexpected status code: %d", res.StatusCode)

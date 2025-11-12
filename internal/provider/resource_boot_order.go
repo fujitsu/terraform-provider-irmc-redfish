@@ -355,7 +355,7 @@ func applyBootOrderPlan(service *gofish.Service, currentBootOrder []BootOrderEnt
 		return diags
 	}
 
-	res.Body.Close()
+	CloseResource(res.Body)
 
 	var v [][]string
 	for _, item := range plannedBootOrder {
@@ -383,7 +383,7 @@ func applyBootOrderPlan(service *gofish.Service, currentBootOrder []BootOrderEnt
 		return diags
 	}
 
-	res.Body.Close()
+	CloseResource(res.Body)
 	return diags
 }
 
@@ -398,7 +398,7 @@ func getBiosSettingsFutureAttributesNumber(service *gofish.Service) (length int,
 		return 0, diags
 	}
 
-	defer res.Body.Close()
+	defer CloseResource(res.Body)
 
 	var config BiosSettings
 	bodyBytes, err := io.ReadAll(res.Body)

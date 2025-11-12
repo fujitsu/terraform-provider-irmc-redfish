@@ -308,7 +308,8 @@ func handleTftpUpdate(api *gofish.APIClient, plan *models.IrmcFirmwareUpdateReso
 	if err != nil {
 		return "", fmt.Errorf("failed to fetch data from Redfish endpoint: %v", err)
 	}
-	defer res.Body.Close()
+
+	CloseResource(res.Body)
 
 	payload := map[string]interface{}{
 		"ServerName":   plan.TftpServerAddr.ValueString(),
@@ -320,7 +321,8 @@ func handleTftpUpdate(api *gofish.APIClient, plan *models.IrmcFirmwareUpdateReso
 	if err != nil {
 		return "", fmt.Errorf("failed to send PATCH request: %v", err)
 	}
-	defer res.Body.Close()
+
+	CloseResource(res.Body)
 
 	if res.StatusCode != http.StatusOK && res.StatusCode != http.StatusNoContent && res.StatusCode != http.StatusAccepted {
 		return "", fmt.Errorf("PATCH request failed with status code: %d", res.StatusCode)
@@ -331,7 +333,8 @@ func handleTftpUpdate(api *gofish.APIClient, plan *models.IrmcFirmwareUpdateReso
 	if err != nil {
 		return "", fmt.Errorf("failed to send POST request: %v", err)
 	}
-	defer res.Body.Close()
+
+	defer CloseResource(res.Body)
 
 	if res.StatusCode != http.StatusOK && res.StatusCode != http.StatusNoContent && res.StatusCode != http.StatusAccepted {
 		return "", fmt.Errorf("iRMC TFTP Firmware Update status code: %d", res.StatusCode)
@@ -352,7 +355,8 @@ func handleMemoryCardUpdate(api *gofish.APIClient, memoryCardFirmwareUpdateEndpo
 	if err != nil {
 		return "", fmt.Errorf("failed to send POST request: %v", err)
 	}
-	defer res.Body.Close()
+
+	defer CloseResource(res.Body)
 
 	if res.StatusCode != http.StatusOK && res.StatusCode != http.StatusNoContent && res.StatusCode != http.StatusAccepted {
 		return "", fmt.Errorf("iRMC MemoryCard Firmware Update status code: %d", res.StatusCode)
@@ -410,7 +414,8 @@ func sendFileFirmwareUpdate(api *gofish.APIClient, fileData *os.File, fileFirmwa
 	if err != nil {
 		return "", fmt.Errorf("error sending firmware update: %w", err)
 	}
-	defer resp.Body.Close()
+
+	defer CloseResource(resp.Body)
 
 	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusAccepted {
 		body, err := io.ReadAll(resp.Body)
@@ -434,7 +439,8 @@ func setSelectors(api *gofish.APIClient, plan *models.IrmcFirmwareUpdateResource
 	if err != nil {
 		return fmt.Errorf("failed to fetch data from Redfish endpoint: %w", err)
 	}
-	defer res.Body.Close()
+
+	CloseResource(res.Body)
 
 	payload := map[string]interface{}{
 		"iRMCBootSelector":  plan.IRMCBootSelector.ValueString(),
@@ -447,7 +453,8 @@ func setSelectors(api *gofish.APIClient, plan *models.IrmcFirmwareUpdateResource
 	if err != nil {
 		return fmt.Errorf("failed to send PATCH request: %w", err)
 	}
-	defer res.Body.Close()
+
+	defer CloseResource(res.Body)
 
 	if res.StatusCode != http.StatusOK && res.StatusCode != http.StatusNoContent && res.StatusCode != http.StatusAccepted {
 		body, err := io.ReadAll(res.Body)

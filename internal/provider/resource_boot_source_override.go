@@ -252,7 +252,8 @@ func bootSourceOverrideApply(api *gofish.APIClient, plan *models.BootSourceOverr
 		return fmt.Errorf("error during read of /BootConfig GET response body '%w'", err)
 	}
 
-	resp.Body.Close()
+	CloseResource(resp.Body)
+
 	var config bootConfig
 	if err = json.Unmarshal(bodyBytes, &config); err != nil {
 		return fmt.Errorf("error during unmarshal of /BootConfig GET response '%w'", err)
@@ -271,7 +272,7 @@ func bootSourceOverrideApply(api *gofish.APIClient, plan *models.BootSourceOverr
 		return fmt.Errorf("error during Patch of /BootConfig '%s'", err.Error())
 	}
 
-	resp.Body.Close()
+	CloseResource(resp.Body)
 	return nil
 }
 

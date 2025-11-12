@@ -245,7 +245,8 @@ func (r *IrmcCertificateCaUpdDeployResource) Delete(ctx context.Context, req res
 		resp.Diagnostics.AddError("Failed to delete certificate", err.Error())
 		return
 	}
-	defer deleteRes.Body.Close()
+
+	defer CloseResource(deleteRes.Body)
 
 	if deleteRes.StatusCode != http.StatusOK && deleteRes.StatusCode != http.StatusNoContent {
 		responseBody, _ := io.ReadAll(deleteRes.Body)
@@ -269,7 +270,8 @@ func handleFileCertificate(api *gofish.APIClient, plan *models.CertificateCaUpdD
 	if err != nil {
 		return fmt.Errorf("failed to upload certificate file: %w", err)
 	}
-	defer res.Body.Close()
+
+	defer CloseResource(res.Body)
 
 	if res.StatusCode != http.StatusOK && res.StatusCode != http.StatusAccepted && res.StatusCode != http.StatusCreated {
 		responseBody, _ := io.ReadAll(res.Body)
@@ -294,7 +296,8 @@ func handleTextCertificate(api *gofish.APIClient, plan *models.CertificateCaUpdD
 	if err != nil {
 		return fmt.Errorf("failed to upload certificate text: %w", err)
 	}
-	defer res.Body.Close()
+
+	defer CloseResource(res.Body)
 
 	if res.StatusCode != http.StatusOK && res.StatusCode != http.StatusAccepted && res.StatusCode != http.StatusCreated {
 		responseBody, _ := io.ReadAll(res.Body)

@@ -214,7 +214,8 @@ func sendCertificateUpdate(api *gofish.APIClient, filePath, uploadCertEndpoint s
 	if err != nil {
 		return fmt.Errorf("unable to open file %s: %w", filePath, err)
 	}
-	defer file.Close()
+
+	defer CloseResource(file)
 
 	payload := map[string]io.Reader{
 		"data": file,
@@ -224,7 +225,8 @@ func sendCertificateUpdate(api *gofish.APIClient, filePath, uploadCertEndpoint s
 	if err != nil {
 		return fmt.Errorf("error sending certificate update: %w", err)
 	}
-	defer resp.Body.Close()
+
+	defer CloseResource(resp.Body)
 
 	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusNoContent {
 		body, _ := io.ReadAll(resp.Body)
@@ -239,7 +241,8 @@ func verifyCertificateCompliance(api *gofish.APIClient, verifyCertEndpoint strin
 	if err != nil {
 		return fmt.Errorf("error sending POST request: %w", err)
 	}
-	defer resp.Body.Close()
+
+	defer CloseResource(resp.Body)
 
 	if resp.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(resp.Body)

@@ -85,7 +85,8 @@ func getSystemStorageOemRaidCapabilitiesResource(service *gofish.Service, endpoi
 	if err != nil {
 		return config, fmt.Errorf("could not access RAIDCapabilities resource due to: %s", err.Error())
 	}
-	defer res.Body.Close()
+
+	defer CloseResource(res.Body)
 
 	if res.StatusCode != http.StatusOK {
 		return config, fmt.Errorf("could not access RAIDCapabilities resource, http code %d", res.StatusCode)
@@ -412,7 +413,7 @@ func requestVolumeCreationAndSuperviseTheProcess(ctx context.Context, service *g
 		return diags
 	}
 
-	defer res.Body.Close()
+	defer CloseResource(res.Body)
 
 	if res.StatusCode == http.StatusAccepted {
 		task_location := res.Header.Get(HTTP_HEADER_LOCATION)
@@ -505,7 +506,7 @@ func deleteStorageVolume(ctx context.Context, service *gofish.Service,
 		return diags
 	}
 
-	defer res.Body.Close()
+	defer CloseResource(res.Body)
 
 	if res.StatusCode == http.StatusAccepted {
 		task_location := res.Header.Get(HTTP_HEADER_LOCATION)
@@ -708,7 +709,8 @@ func patchVolumeEndpoint(ctx context.Context, service *gofish.Service, endpoint 
 	if err != nil {
 		return "", err
 	}
-	defer resp.Body.Close()
+
+	defer CloseResource(resp.Body)
 
 	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusAccepted {
 		return "", fmt.Errorf("PATCH request on '%s' finished with not expected status '%d'", endpoint, resp.StatusCode)
@@ -717,12 +719,16 @@ func patchVolumeEndpoint(ctx context.Context, service *gofish.Service, endpoint 
 	if resp.StatusCode == http.StatusAccepted {
 		taskLocation := resp.Header.Get(HTTP_HEADER_LOCATION)
 		if taskLocation == "" {
-			return "", fmt.Errorf("Location header not found in response")
+			return "", fmt.Errorf("location header not found in response")
 		}
 		return taskLocation, nil
 	} else {
 		// Request might be accepted but some properties will not be successfully validated and it should be reported to terraform
 		out, err := io.ReadAll(resp.Body)
+		if err != nil {
+			return "", err
+		}
+
 		var respStruct StoragePatchResponse
 
 		err = json.Unmarshal(out, &respStruct)

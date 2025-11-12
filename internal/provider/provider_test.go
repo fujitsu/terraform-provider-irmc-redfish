@@ -108,7 +108,7 @@ func testAccPrepareVMediaSlots(creds TestingServerCredentials) {
 		return
 	}
 
-	defer resp.Body.Close()
+	defer CloseResource(resp.Body)
 
 	if resp.StatusCode == http.StatusOK {
 		bodyBytes, err := io.ReadAll(resp.Body)

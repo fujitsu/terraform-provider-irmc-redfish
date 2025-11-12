@@ -54,7 +54,7 @@ func waitTillBiosSettingsApplied(ctx context.Context, service *gofish.Service, t
 
 	// Due to BIOS setting change it might happen that host will be powered off after
 	// BIOS POST phase, so to not break the process the error must be omitted
-	if err.Error() != "BIOS exited POST but host powered off" {
+	if err != nil && err.Error() != "BIOS exited POST but host powered off" {
 		diags.AddError("Host could not be powered on to finish BIOS settings", err.Error())
 		return diags
 	}

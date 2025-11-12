@@ -107,7 +107,7 @@ func convertPlanToPayload(isFsas bool, plan models.StorageResourceModel) (any, b
 	anyValueIntoPlan := false
 
 	var oemObject storageControllerOem
-	oem := storageController.Oem.OemFsas
+	var oem *storageControllerOem
 
 	if isFsas {
 		storageController.Oem.OemFsas = &oemObject
@@ -287,7 +287,8 @@ func patchStorageEndpoint(ctx context.Context, service *gofish.Service, endpoint
 	if err != nil {
 		return "", err
 	}
-	defer resp.Body.Close()
+
+	defer CloseResource(resp.Body)
 
 	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusAccepted {
 		return "", fmt.Errorf("PATCH request on '%s' finished with not expected status '%d'", endpoint, resp.StatusCode)
@@ -296,7 +297,7 @@ func patchStorageEndpoint(ctx context.Context, service *gofish.Service, endpoint
 	if resp.StatusCode == http.StatusAccepted {
 		taskLocation := resp.Header.Get(HTTP_HEADER_LOCATION)
 		if taskLocation == "" {
-			return "", fmt.Errorf("Location header not found in response")
+			return "", fmt.Errorf("location header not found in response")
 		}
 		return taskLocation, nil
 	}

@@ -286,7 +286,8 @@ func ConfigSimpleUpd(ctx context.Context, config *gofish.APIClient, updateImage 
 		diags.AddError("Simple Update POST request failed", err.Error())
 		return "", diags
 	}
-	defer resp.Body.Close()
+
+	defer CloseResource(resp.Body)
 
 	if resp.StatusCode != http.StatusAccepted {
 		diags.AddError("Simple Update request not accepted", fmt.Sprintf("unexpected status code: %d", resp.StatusCode))
@@ -307,7 +308,8 @@ func UpdateUmeToolsDirName(apiClient *gofish.APIClient, umeFileDirectory string,
 	if err != nil {
 		return fmt.Errorf("failed to fetch data from Redfish endpoint: %v", err)
 	}
-	defer res.Body.Close()
+
+	defer CloseResource(res.Body)
 
 	var dataUpdateService map[string]interface{}
 	err = json.NewDecoder(res.Body).Decode(&dataUpdateService)
@@ -348,7 +350,8 @@ func UpdateUmeToolsDirName(apiClient *gofish.APIClient, umeFileDirectory string,
 	if err != nil {
 		return fmt.Errorf("failed to send PATCH request: %v", err)
 	}
-	defer res.Body.Close()
+
+	defer CloseResource(res.Body)
 
 	if res.StatusCode != http.StatusOK && res.StatusCode != http.StatusNoContent {
 		return fmt.Errorf("PATCH request failed with status code: %d", res.StatusCode)

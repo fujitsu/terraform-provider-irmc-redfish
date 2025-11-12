@@ -187,7 +187,8 @@ func caCertificateUpload(api *gofish.APIClient, plan *models.CertificateCaCasSmt
 	if err != nil {
 		return fmt.Errorf("unable to open file %s: %w", plan.CertificateCaFile.ValueString(), err)
 	}
-	defer file.Close()
+
+	defer CloseResource(file)
 
 	payload := map[string]io.Reader{
 		"data": file,
@@ -197,7 +198,8 @@ func caCertificateUpload(api *gofish.APIClient, plan *models.CertificateCaCasSmt
 	if err != nil {
 		return fmt.Errorf("error sending certificate upload: %w", err)
 	}
-	defer resp.Body.Close()
+
+	defer CloseResource(resp.Body)
 
 	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusNoContent {
 		body, _ := io.ReadAll(resp.Body)

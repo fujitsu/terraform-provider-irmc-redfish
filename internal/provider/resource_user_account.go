@@ -328,7 +328,7 @@ func (r *IrmcUserAccountResource) Create(ctx context.Context, req resource.Creat
 		return
 	}
 
-	defer respPost.Body.Close()
+	defer CloseResource(respPost.Body)
 
 	if respPost.StatusCode != http.StatusCreated {
 		resp.Diagnostics.AddError("error. User Account Creation POST request failed - ", fmt.Sprintf("Received status code: %d", respPost.StatusCode))
@@ -390,7 +390,8 @@ func (r *IrmcUserAccountResource) Read(ctx context.Context, req resource.ReadReq
 		resp.Diagnostics.AddError("Error reading Redfish user account", err.Error())
 		return
 	}
-	defer respGet.Body.Close()
+
+	defer CloseResource(respGet.Body)
 
 	var data map[string]interface{}
 	err = json.NewDecoder(respGet.Body).Decode(&data)
@@ -527,7 +528,8 @@ func (r *IrmcUserAccountResource) Update(ctx context.Context, req resource.Updat
 		resp.Diagnostics.AddError("Error reading Redfish user account", err.Error())
 		return
 	}
-	defer respGet.Body.Close()
+
+	defer CloseResource(respGet.Body)
 
 	etag := respGet.Header.Get(HTTP_HEADER_ETAG)
 	if etag == "" {
@@ -542,7 +544,8 @@ func (r *IrmcUserAccountResource) Update(ctx context.Context, req resource.Updat
 		resp.Diagnostics.AddError("Error sending PATCH request", err.Error())
 		return
 	}
-	defer respPatch.Body.Close()
+
+	defer CloseResource(respPatch.Body)
 
 	if respPatch.StatusCode != http.StatusOK && respPatch.StatusCode != http.StatusNoContent {
 		resp.Diagnostics.AddError("User Account Update PATCH request failed", fmt.Sprintf("Received status code: %d", respPatch.StatusCode))
@@ -553,7 +556,8 @@ func (r *IrmcUserAccountResource) Update(ctx context.Context, req resource.Updat
 		resp.Diagnostics.AddError("error. Not able to read updated Redfish user account", err.Error())
 		return
 	}
-	defer respGet.Body.Close()
+
+	defer CloseResource(respGet.Body)
 
 	if respGet.StatusCode == http.StatusNotFound {
 		resp.State.RemoveResource(ctx)
@@ -673,7 +677,8 @@ func (r *IrmcUserAccountResource) Delete(ctx context.Context, req resource.Delet
 		resp.Diagnostics.AddError("Error sending DELETE request", err.Error())
 		return
 	}
-	defer respDelete.Body.Close()
+
+	defer CloseResource(respDelete.Body)
 
 	if respDelete.StatusCode != http.StatusOK && respDelete.StatusCode != http.StatusNoContent {
 		resp.Diagnostics.AddError("User Account Delete DELETE request failed", fmt.Sprintf("Received status code: %d", respDelete.StatusCode))

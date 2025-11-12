@@ -198,7 +198,7 @@ func checkIrmcStatus(ctx context.Context, service *gofish.APIClient, interval in
 		}
 
 		if resp.StatusCode == http.StatusOK {
-			defer resp.Body.Close()
+			defer CloseResource(resp.Body)
 			_, err := io.ReadAll(resp.Body)
 			if err != nil {
 				tflog.Error(ctx, fmt.Sprintf("Error reading response body: %s", err.Error()))
