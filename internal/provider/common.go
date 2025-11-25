@@ -19,8 +19,11 @@ package provider
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
+	"log"
 	"terraform-provider-irmc-redfish/internal/models"
 	"time"
 
@@ -57,6 +60,9 @@ const (
 	HTTP_HEADER_IF_MATCH = "If-Match"
 	HTTP_HEADER_ETAG     = "ETag"
 	HTTP_HEADER_LOCATION = "Location"
+	FSAS                 = "Fsas"
+	TS_FUJITSU           = "ts_fujitsu"
+	FTS                  = "FTS"
 )
 
 type ServerConfig struct {
@@ -273,4 +279,35 @@ func restartIrmc(ctx context.Context, api *gofish.APIClient, RedfishServer []mod
 	}
 
 	return nil
+}
+
+// CloseResource is a generic function that closes an io.Closer
+// and handles the error, satisfying linters like errcheck.
+// T must be constrainted by io.Closer, meaning it must have a Close() error method implemented.
+func CloseResource[T io.Closer](resource T) {
+	if err := resource.Close(); err != nil {
+		log.Printf("Error closing resource: %v", err)
+	}
+}
+
+func IsFsasCheck(ctx context.Context, api *gofish.APIClient) (bool, error) {
+	res, err := api.Get("/redfish/v1/")
+	if err != nil {
+		return false, fmt.Errorf("failed to retrieve /redfish/v1/ endpoint: %w", err)
+	}
+
+	defer CloseResource(res.Body)
+
+	var serviceRoot map[string]interface{}
+	if err := json.NewDecoder(res.Body).Decode(&serviceRoot); err != nil {
+		return false, fmt.Errorf("failed to parse response from /redfish/v1/: %w", err)
+	}
+
+	if oem, ok := serviceRoot["Oem"].(map[string]interface{}); ok {
+		if _, ok := oem["Fsas"]; ok {
+			return true, nil
+		}
+	}
+
+	return false, nil
 }

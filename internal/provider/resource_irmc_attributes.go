@@ -44,7 +44,9 @@ import (
 	"github.com/stmcginnis/gofish/redfish"
 )
 
-const IRMC_ATTRIBUTES_SETTINGS_ENDPOINT = "/redfish/v1/Managers/iRMC/Oem/ts_fujitsu/iRMCConfiguration/Attributes"
+type irmcAttributesEndpoints struct {
+	irmcAttributesSettingsEndpoint string
+}
 
 // Ensure provider defined types fully satisfy framework interfaces.
 var _ resource.Resource = &IrmcAttributesResource{}
@@ -133,8 +135,8 @@ func (r *IrmcAttributesResource) Create(ctx context.Context, req resource.Create
 	}
 
 	// Provide synchronization
-	var endpoint string = plan.RedfishServer[0].Endpoint.ValueString()
-	var resource_name string = "resource-irmc-attributes"
+	var endpoint = plan.RedfishServer[0].Endpoint.ValueString()
+	var resource_name = "resource-irmc-attributes"
 	mutexPool.Lock(ctx, endpoint, resource_name)
 	defer mutexPool.Unlock(ctx, endpoint, resource_name)
 
@@ -147,6 +149,13 @@ func (r *IrmcAttributesResource) Create(ctx context.Context, req resource.Create
 
 	defer api.Logout()
 
+	isFsas, err := IsFsasCheck(ctx, api)
+	if err != nil {
+		resp.Diagnostics.AddError("Vendor Detection Failed", err.Error())
+		return
+	}
+	endp := getIrmcAttributesEndpoints(isFsas)
+
 	var plannedAttributes map[string]string
 	diags = plan.Attributes.ElementsAs(ctx, &plannedAttributes, true)
 	resp.Diagnostics.Append(diags...)
@@ -154,25 +163,25 @@ func (r *IrmcAttributesResource) Create(ctx context.Context, req resource.Create
 		return
 	}
 
-	adjustedAttributes, diags := validateAndAdjustPlannedIrmcAttributes(ctx, api.Service, plannedAttributes)
+	adjustedAttributes, diags := validateAndAdjustPlannedIrmcAttributes(ctx, api.Service, plannedAttributes, endp.irmcAttributesSettingsEndpoint)
 	resp.Diagnostics.Append(diags...)
 	if diags.HasError() {
 		return
 	}
 
-	diags, location := applyIrmcAttributes(api.Service, adjustedAttributes)
+	diags, location := applyIrmcAttributes(api.Service, adjustedAttributes, endp.irmcAttributesSettingsEndpoint)
 	resp.Diagnostics.Append(diags...)
 	if diags.HasError() {
 		return
 	}
 
-	diags = waitTillIrmcAttributesSettingsApplied(ctx, api.Service, location, plan.JobTimeout.ValueInt64())
+	diags = waitTillIrmcAttributesSettingsApplied(ctx, api.Service, location, plan.JobTimeout.ValueInt64(), isFsas)
 	resp.Diagnostics.Append(diags...)
 	if diags.HasError() {
 		return
 	}
 
-	plan.Id = types.StringValue(IRMC_ATTRIBUTES_SETTINGS_ENDPOINT)
+	plan.Id = types.StringValue(endp.irmcAttributesSettingsEndpoint)
 
 	diags = resp.State.Set(ctx, &plan)
 	resp.Diagnostics.Append(diags...)
@@ -201,7 +210,14 @@ func (r *IrmcAttributesResource) Read(ctx context.Context, req resource.ReadRequ
 
 	defer api.Logout()
 
-	diags := readIrmcAttributesSettingsToModel(ctx, api.Service, &state.Attributes, false)
+	isFsas, err := IsFsasCheck(ctx, api)
+	if err != nil {
+		resp.Diagnostics.AddError("Vendor Detection Failed", err.Error())
+		return
+	}
+	endp := getIrmcAttributesEndpoints(isFsas)
+
+	diags := readIrmcAttributesSettingsToModel(ctx, api.Service, &state.Attributes, false, endp.irmcAttributesSettingsEndpoint)
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
 		return
@@ -233,6 +249,13 @@ func (r *IrmcAttributesResource) Update(ctx context.Context, req resource.Update
 
 	defer api.Logout()
 
+	isFsas, err := IsFsasCheck(ctx, api)
+	if err != nil {
+		resp.Diagnostics.AddError("Vendor Detection Failed", err.Error())
+		return
+	}
+	endp := getIrmcAttributesEndpoints(isFsas)
+
 	var plannedAttributes map[string]string
 	diags = plan.Attributes.ElementsAs(ctx, &plannedAttributes, true)
 	resp.Diagnostics.Append(diags...)
@@ -240,25 +263,25 @@ func (r *IrmcAttributesResource) Update(ctx context.Context, req resource.Update
 		return
 	}
 
-	adjustedAttributes, diags := validateAndAdjustPlannedIrmcAttributes(ctx, api.Service, plannedAttributes)
+	adjustedAttributes, diags := validateAndAdjustPlannedIrmcAttributes(ctx, api.Service, plannedAttributes, endp.irmcAttributesSettingsEndpoint)
 	resp.Diagnostics.Append(diags...)
 	if diags.HasError() {
 		return
 	}
 
-	diags, location := applyIrmcAttributes(api.Service, adjustedAttributes)
+	diags, location := applyIrmcAttributes(api.Service, adjustedAttributes, endp.irmcAttributesSettingsEndpoint)
 	resp.Diagnostics.Append(diags...)
 	if diags.HasError() {
 		return
 	}
 
-	diags = waitTillIrmcAttributesSettingsApplied(ctx, api.Service, location, plan.JobTimeout.ValueInt64())
+	diags = waitTillIrmcAttributesSettingsApplied(ctx, api.Service, location, plan.JobTimeout.ValueInt64(), isFsas)
 	resp.Diagnostics.Append(diags...)
 	if diags.HasError() {
 		return
 	}
 
-	plan.Id = types.StringValue(IRMC_ATTRIBUTES_SETTINGS_ENDPOINT)
+	plan.Id = types.StringValue(endp.irmcAttributesSettingsEndpoint)
 
 	diags = resp.State.Set(ctx, &plan)
 	resp.Diagnostics.Append(diags...)
@@ -303,23 +326,23 @@ type irmcAttributesConfig struct {
 	Attributes redfish.SettingsAttributes `json:"Attributes"`
 }
 
-func getIrmcAttributesResource(service *gofish.Service) (irmcAttributesConfig, error) {
-	res, err := service.GetClient().Get(IRMC_ATTRIBUTES_SETTINGS_ENDPOINT)
+func getIrmcAttributesResource(service *gofish.Service, endpointAttributes string) (irmcAttributesConfig, error) {
+	res, err := service.GetClient().Get(endpointAttributes)
 	var resource irmcAttributesConfig
 	if err != nil {
-		return resource, fmt.Errorf("Could not access iRMC attributes resource due to %s", err.Error())
+		return resource, fmt.Errorf("could not access iRMC attributes resource due to %s", err.Error())
 	}
 
-	defer res.Body.Close()
+	defer CloseResource(res.Body)
 
 	bodyBytes, err := io.ReadAll(res.Body)
 	if err != nil {
-		return resource, fmt.Errorf("Error while reading iRMC attributes response body: %s", err.Error())
+		return resource, fmt.Errorf("error while reading iRMC attributes response body: %s", err.Error())
 	}
 
 	err = json.Unmarshal(bodyBytes, &resource)
 	if err != nil {
-		return resource, fmt.Errorf("Error while iRMC attributes body unmarshalling: %s", err.Error())
+		return resource, fmt.Errorf("error while iRMC attributes body unmarshalling: %s", err.Error())
 	}
 
 	return resource, nil
@@ -327,8 +350,8 @@ func getIrmcAttributesResource(service *gofish.Service) (irmcAttributesConfig, e
 
 // validateAndAdjustPlannedIrmcAttributes compares planned attributes values with current attributes from system
 // pointed by service. Function returns list of applicable attributes after validation.
-func validateAndAdjustPlannedIrmcAttributes(ctx context.Context, service *gofish.Service, plannedAttributes map[string]string) (adjustedAttributes map[string]interface{}, diags diag.Diagnostics) {
-	resource, err := getIrmcAttributesResource(service)
+func validateAndAdjustPlannedIrmcAttributes(ctx context.Context, service *gofish.Service, plannedAttributes map[string]string, endpointAttributes string) (adjustedAttributes map[string]interface{}, diags diag.Diagnostics) {
+	resource, err := getIrmcAttributesResource(service, endpointAttributes)
 	if err != nil {
 		diags.AddError("Error while reading /iRMCConfiguration/Attributes", err.Error())
 		return adjustedAttributes, diags
@@ -350,7 +373,7 @@ func validateAndAdjustPlannedIrmcAttributes(ctx context.Context, service *gofish
 	for key, newVal := range plannedAttributes {
 		currVal, ok := currAttributes[key]
 		if !ok {
-			var msg string = fmt.Sprintf("Attribute '%s' is not supported by the system", key)
+			var msg = fmt.Sprintf("Attribute '%s' is not supported by the system", key)
 			diags.AddError("Not supported attribute", msg)
 			return adjustedAttributes, diags
 		}
@@ -360,7 +383,7 @@ func validateAndAdjustPlannedIrmcAttributes(ctx context.Context, service *gofish
 			// to be accepted by Redfish API and BIOS
 			newValInt, err := strconv.Atoi(newVal)
 			if err != nil {
-				var msg string = fmt.Sprintf("Attribute '%s' has type int in current Attributes, but new value conversion failed '%s'", key, err.Error())
+				var msg = fmt.Sprintf("Attribute '%s' has type int in current Attributes, but new value conversion failed '%s'", key, err.Error())
 				diags.AddError("Attribute type conversion error", msg)
 				return adjustedAttributes, diags
 			}
@@ -368,14 +391,14 @@ func validateAndAdjustPlannedIrmcAttributes(ctx context.Context, service *gofish
 			if currValInt-newValInt != 0 {
 				newAttributes[key] = newValInt
 			} else {
-				var log string = fmt.Sprintf("Planned attribute '%s' has same value as current one, so omit", key)
+				var log = fmt.Sprintf("Planned attribute '%s' has same value as current one, so omit", key)
 				tflog.Info(ctx, log)
 			}
 		} else {
 			if currVal != newVal {
 				newAttributes[key] = newVal
 			} else {
-				var log string = fmt.Sprintf("Planned attribute '%s' has same value as current one, so omit", key)
+				var log = fmt.Sprintf("Planned attribute '%s' has same value as current one, so omit", key)
 				tflog.Info(ctx, log)
 			}
 		}
@@ -390,8 +413,8 @@ func validateAndAdjustPlannedIrmcAttributes(ctx context.Context, service *gofish
 }
 
 // readIrmcAttributesSettingsToModel reads target bios settings from service into state attributes.
-func readIrmcAttributesSettingsToModel(ctx context.Context, service *gofish.Service, attrMap *types.Map, updateAll bool) (diags diag.Diagnostics) {
-	resource, err := getIrmcAttributesResource(service)
+func readIrmcAttributesSettingsToModel(ctx context.Context, service *gofish.Service, attrMap *types.Map, updateAll bool, endpointAttributes string) (diags diag.Diagnostics) {
+	resource, err := getIrmcAttributesResource(service, endpointAttributes)
 	if err != nil {
 		diags.AddError("Error while reading /iRMCConfiguration/Attributes", err.Error())
 		return diags
@@ -421,29 +444,29 @@ func readIrmcAttributesSettingsToModel(ctx context.Context, service *gofish.Serv
 	return diags
 }
 
-func applyIrmcAttributes(service *gofish.Service, attributes map[string]interface{}) (diags diag.Diagnostics, location string) {
+func applyIrmcAttributes(service *gofish.Service, attributes map[string]interface{}, endpointAttributes string) (diags diag.Diagnostics, location string) {
 	client := service.GetClient()
-	res, err := client.Get(IRMC_ATTRIBUTES_SETTINGS_ENDPOINT)
+	res, err := client.Get(endpointAttributes)
 	if err != nil {
-		diags.AddError("Reading /redfish/v1/Managers/iRMC/Oem/ts_fujitsu/iRMCConfiguration/Attributes failed", err.Error())
+		diags.AddError("Reading iRMCConfiguration/Attributes failed", err.Error())
 		return diags, ""
 	}
 
-	res.Body.Close()
+	CloseResource(res.Body)
 
 	payload := map[string]interface{}{
 		"Attributes": attributes,
 	}
 
-	res, err = client.PatchWithHeaders(IRMC_ATTRIBUTES_SETTINGS_ENDPOINT, payload,
+	res, err = client.PatchWithHeaders(endpointAttributes, payload,
 		map[string]string{HTTP_HEADER_IF_MATCH: res.Header.Get(HTTP_HEADER_ETAG)})
 
 	if err != nil {
-		diags.AddError("Changing /redfish/v1/Managers/iRMC/Oem/ts_fujitsu/iRMCConfiguration/Attributes failed", err.Error())
+		diags.AddError("Changing iRMCConfiguration/Attributes failed", err.Error())
 		return diags, ""
 	}
 
-	res.Body.Close()
+	CloseResource(res.Body)
 
 	if res.StatusCode == http.StatusAccepted {
 		location = res.Header.Get(HTTP_HEADER_LOCATION)
@@ -451,18 +474,18 @@ func applyIrmcAttributes(service *gofish.Service, attributes map[string]interfac
 	return diags, location
 }
 
-func waitTillIrmcAttributesSettingsApplied(ctx context.Context, service *gofish.Service, task_location string, timeout int64) (diags diag.Diagnostics) {
+func waitTillIrmcAttributesSettingsApplied(ctx context.Context, service *gofish.Service, task_location string, timeout int64, isFsas bool) (diags diag.Diagnostics) {
 	_, err := WaitForRedfishTaskEnd(ctx, service, task_location, timeout)
 	if err != nil {
 		diags.AddError("Task for patching attributes reported error", err.Error())
-		logs, internal_diags := FetchRedfishTaskLog(service, task_location)
+		logs, internal_diags := FetchRedfishTaskLog(service, task_location, isFsas)
 		if logs == nil {
 			diags = append(diags, internal_diags...)
 		} else {
 			diags.AddError("Task logs for patching attributes", string(logs))
 		}
 	} else {
-		diags = verifyErrorsInIrmcAttributesTaskLog(service, task_location)
+		diags = verifyErrorsInIrmcAttributesTaskLog(service, task_location, isFsas)
 	}
 
 	return diags
@@ -475,8 +498,8 @@ type taskLog struct {
 	} `json:"Messages"`
 }
 
-func verifyErrorsInIrmcAttributesTaskLog(service *gofish.Service, task_location string) (diags diag.Diagnostics) {
-	logs_bytes, internal_diags := FetchRedfishTaskLog(service, task_location)
+func verifyErrorsInIrmcAttributesTaskLog(service *gofish.Service, task_location string, isFsas bool) (diags diag.Diagnostics) {
+	logs_bytes, internal_diags := FetchRedfishTaskLog(service, task_location, isFsas)
 	if logs_bytes == nil {
 		diags = append(diags, internal_diags...)
 	} else {
@@ -496,4 +519,16 @@ func verifyErrorsInIrmcAttributesTaskLog(service *gofish.Service, task_location 
 	}
 
 	return diags
+}
+
+func getIrmcAttributesEndpoints(isFsas bool) irmcAttributesEndpoints {
+	if isFsas {
+		return irmcAttributesEndpoints{
+			irmcAttributesSettingsEndpoint: fmt.Sprintf("/redfish/v1/Managers/iRMC/Oem/%s/iRMCConfiguration/Attributes", FSAS),
+		}
+	} else {
+		return irmcAttributesEndpoints{
+			irmcAttributesSettingsEndpoint: fmt.Sprintf("/redfish/v1/Managers/iRMC/Oem/%s/iRMCConfiguration/Attributes", TS_FUJITSU),
+		}
+	}
 }

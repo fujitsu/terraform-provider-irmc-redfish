@@ -42,7 +42,7 @@ func TestAccStorageResource_positive_complex(t *testing.T) {
 					resource.TestCheckResourceAttr(storageResourceName, "storage_controller_serial_number",
 						os.Getenv("TF_TESTING_STORAGE_SERIAL_NUMBER")),
 					resource.TestCheckResourceAttr(storageResourceName, "patrol_read_rate", "33"),
-					resource.TestCheckResourceAttr(storageResourceName, "bios_continue_on_error", "StopOnErrors"),
+					resource.TestCheckResourceAttr(storageResourceName, "bios_continue_on_error", "StopOnErrors"), // not supported since M8 generation
 					resource.TestCheckResourceAttr(storageResourceName, "bios_status", "false"),
 					resource.TestCheckResourceAttr(storageResourceName, "bgi_rate", "31"),
 					resource.TestCheckResourceAttr(storageResourceName, "mdc_rate", "32"),
@@ -57,7 +57,7 @@ func TestAccStorageResource_positive_complex(t *testing.T) {
 					resource.TestCheckResourceAttr(storageResourceName, "storage_controller_serial_number",
 						os.Getenv("TF_TESTING_STORAGE_SERIAL_NUMBER")),
 					resource.TestCheckResourceAttr(storageResourceName, "patrol_read_rate", "30"),
-					resource.TestCheckResourceAttr(storageResourceName, "bios_continue_on_error", "PauseOnErrors"),
+					resource.TestCheckResourceAttr(storageResourceName, "bios_continue_on_error", "PauseOnErrors"), // not supported since M8 generation
 					resource.TestCheckResourceAttr(storageResourceName, "bios_status", "true"),
 					resource.TestCheckResourceAttr(storageResourceName, "bgi_rate", "32"),
 					resource.TestCheckResourceAttr(storageResourceName, "mdc_rate", "33"),
@@ -98,7 +98,7 @@ func TestAccStorageResource_positive_simple(t *testing.T) {
 				Config: testAccStorageResourceSimpleConfig(creds, os.Getenv("TF_TESTING_STORAGE_SERIAL_NUMBER"), "PauseOnErrors", 31),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr(storageResourceName, "storage_controller_serial_number", os.Getenv("TF_TESTING_STORAGE_SERIAL_NUMBER")),
-					resource.TestCheckResourceAttr(storageResourceName, "bios_continue_on_error", "PauseOnErrors"),
+					resource.TestCheckResourceAttr(storageResourceName, "bios_continue_on_error", "PauseOnErrors"), // not supported since M8 generation
 				),
 			},
 		},
@@ -206,7 +206,7 @@ func testAccStorageResourceConfig(testingInfo TestingServerCredentials, serial s
 		}
 
         storage_controller_serial_number = "%s"
-        bios_continue_on_error = "%s"
+		bios_continue_on_error = "%s"
         bios_status = %t
 		patrol_read_rate = %d
 		bgi_rate = %d
@@ -218,7 +218,9 @@ func testAccStorageResourceConfig(testingInfo TestingServerCredentials, serial s
 		testingInfo.Username,
 		testingInfo.Password,
 		testingInfo.Endpoint,
-		serial, bios_continue_on_error, bios_status,
+		serial,
+		bios_continue_on_error,
+		bios_status,
 		patrol_read_rate, bgi_rate, mdc_rate, rebuild_rate, job_timeout,
 	)
 }

@@ -103,8 +103,8 @@ func (r *IrmcRestartResource) Create(ctx context.Context, req resource.CreateReq
 		return
 	}
 
-	var endpoint string = plan.RedfishServer[0].Endpoint.ValueString()
-	var resource_name string = "resource-irmc-reset"
+	var endpoint = plan.RedfishServer[0].Endpoint.ValueString()
+	var resource_name = "resource-irmc-reset"
 	mutexPool.Lock(ctx, endpoint, resource_name)
 	defer mutexPool.Unlock(ctx, endpoint, resource_name)
 
@@ -198,7 +198,7 @@ func checkIrmcStatus(ctx context.Context, service *gofish.APIClient, interval in
 		}
 
 		if resp.StatusCode == http.StatusOK {
-			defer resp.Body.Close()
+			defer CloseResource(resp.Body)
 			_, err := io.ReadAll(resp.Body)
 			if err != nil {
 				tflog.Error(ctx, fmt.Sprintf("Error reading response body: %s", err.Error()))

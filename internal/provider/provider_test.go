@@ -18,6 +18,7 @@ limitations under the License.
 package provider
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -86,14 +87,28 @@ func testAccPrepareVMediaSlots(creds TestingServerCredentials) {
 		return
 	}
 
-	path := "/redfish/v1/Systems/0/Oem/ts_fujitsu/VirtualMedia"
+	isFsas, err := IsFsasCheck(context.Background(), api)
+	if err != nil {
+		log.Printf("Vendor check reported error %s", err.Error())
+		return
+	}
+
+	var oemKey string
+	if isFsas {
+		oemKey = FSAS
+	} else {
+		oemKey = TS_FUJITSU
+	}
+
+	path := fmt.Sprintf("/redfish/v1/Systems/0/Oem/%s/VirtualMedia", oemKey)
+
 	resp, err := api.Get(path)
 	if err != nil {
 		log.Printf("GET on %s reported error %s", path, err.Error())
 		return
 	}
 
-	defer resp.Body.Close()
+	defer CloseResource(resp.Body)
 
 	if resp.StatusCode == http.StatusOK {
 		bodyBytes, err := io.ReadAll(resp.Body)

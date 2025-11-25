@@ -50,52 +50,6 @@ const (
 	USER_TYPE_NONE           = "None"
 )
 
-type RedfishRequest struct {
-	Enabled     bool   `json:"Enabled"`
-	RoleId      string `json:"RoleId"`
-	UserName    string `json:"UserName"`
-	Password    string `json:"Password,omitempty"`
-	Description string `json:"Description"`
-	Oem         Oem    `json:"Oem"`
-}
-
-type Oem struct {
-	TSFujitsu TSFujitsu `json:"ts_fujitsu"`
-}
-
-type TSFujitsu struct {
-	BaseValues  BaseValues  `json:"BaseValues"`
-	Permissions Permissions `json:"Permissions"`
-	Email       Email       `json:"Email"`
-}
-
-type BaseValues struct {
-	Enabled bool   `json:"Enabled"`
-	Shell   string `json:"Shell"`
-}
-
-type Permissions struct {
-	Standard StandardPermissions `json:"Standard"`
-	Extended ExtendedPermissions `json:"Extended"`
-}
-
-type StandardPermissions struct {
-	Lan    string `json:"Lan"`
-	Serial string `json:"Serial"`
-}
-
-type ExtendedPermissions struct {
-	ConfigureUsers      bool `json:"ConfigureUsers"`
-	ConfigureIrmc       bool `json:"ConfigureIrmc"`
-	UseVideoRedirection bool `json:"UseVideoRedirection"`
-	UseRemoteStorage    bool `json:"UseRemoteStorage"`
-}
-
-type Email struct {
-	AlertChassisEventsUser bool   `json:"AlertChassisEventsUser"`
-	Address                string `json:"Address,omitempty"`
-}
-
 const (
 	minUserNameLength = 1
 	maxUserNameLength = 16
@@ -311,8 +265,8 @@ func (r *IrmcUserAccountResource) Create(ctx context.Context, req resource.Creat
 	}
 
 	// Provide synchronization
-	var endpoint string = plan.RedfishServer[0].Endpoint.ValueString()
-	var resource_name string = "resource-user-account"
+	var endpoint = plan.RedfishServer[0].Endpoint.ValueString()
+	var resource_name = "resource-user-account"
 	mutexPool.Lock(ctx, endpoint, resource_name)
 	defer mutexPool.Unlock(ctx, endpoint, resource_name)
 
@@ -328,6 +282,11 @@ func (r *IrmcUserAccountResource) Create(ctx context.Context, req resource.Creat
 
 	defer config.Logout()
 
+	isFsas, err := IsFsasCheck(ctx, config)
+	if err != nil {
+		resp.Diagnostics.AddError("Vendor Detection Failed", err.Error())
+		return
+	}
 	plan.Id = types.StringValue(USER_ACCOUNT_ENDPOINT)
 
 	// Chec Password validation
@@ -356,7 +315,7 @@ func (r *IrmcUserAccountResource) Create(ctx context.Context, req resource.Creat
 		resp.Diagnostics.AddError("error.", err.Error())
 		return
 	}
-	createPayload, err := InitializeUserAccountRedfishRequest(plan, Create)
+	createPayload, err := InitializeUserAccountRedfishRequest(plan, Create, isFsas)
 	if err != nil {
 		resp.Diagnostics.AddError("error.", err.Error())
 		return
@@ -369,7 +328,7 @@ func (r *IrmcUserAccountResource) Create(ctx context.Context, req resource.Creat
 		return
 	}
 
-	defer respPost.Body.Close()
+	defer CloseResource(respPost.Body)
 
 	if respPost.StatusCode != http.StatusCreated {
 		resp.Diagnostics.AddError("error. User Account Creation POST request failed - ", fmt.Sprintf("Received status code: %d", respPost.StatusCode))
@@ -388,6 +347,7 @@ func (r *IrmcUserAccountResource) Create(ctx context.Context, req resource.Creat
 		return
 	}
 	plan.UserID = types.StringValue(userId)
+	plan.Id = types.StringValue(fmt.Sprintf("%s/%s", USER_ACCOUNT_ENDPOINT, userId))
 	// Save into State
 	diags = resp.State.Set(ctx, &plan)
 	resp.Diagnostics.Append(diags...)
@@ -411,37 +371,96 @@ func (r *IrmcUserAccountResource) Read(ctx context.Context, req resource.ReadReq
 	}
 	defer config.Logout()
 
+	isFsas, err := IsFsasCheck(ctx, config)
+	if err != nil {
+		resp.Diagnostics.AddError("Vendor Detection Failed", err.Error())
+		return
+	}
+
 	userID := state.UserID.ValueString()
 	url := fmt.Sprintf("%s/%s", USER_ACCOUNT_ENDPOINT, userID)
 
 	respGet, err := config.Get(url)
 	if err != nil {
+		if respGet != nil && respGet.StatusCode == http.StatusNotFound {
+			tflog.Warn(ctx, fmt.Sprintf("User account with ID %s not found, removing from state.", userID))
+			resp.State.RemoveResource(ctx)
+			return
+		}
 		resp.Diagnostics.AddError("Error reading Redfish user account", err.Error())
 		return
 	}
-	defer respGet.Body.Close()
-	var redfishRequest RedfishRequest
-	err = json.NewDecoder(respGet.Body).Decode(&redfishRequest)
+
+	defer CloseResource(respGet.Body)
+
+	var data map[string]interface{}
+	err = json.NewDecoder(respGet.Body).Decode(&data)
 	if err != nil {
 		resp.Diagnostics.AddError("Error decoding JSON from Redfish user account response", err.Error())
 		return
 	}
 
-	state.UserEnabled = types.BoolValue(redfishRequest.Enabled)
-	state.UserUsername = types.StringValue(redfishRequest.UserName)
-	state.UserRole = types.StringValue(redfishRequest.RoleId)
-	if state.UserPassword.IsNull() || state.UserPassword.String() == "" {
+	if val, ok := data["Enabled"].(bool); ok {
+		state.UserEnabled = types.BoolValue(val)
+	}
+	if val, ok := data["UserName"].(string); ok {
+		state.UserUsername = types.StringValue(val)
+	}
+	if val, ok := data["RoleId"].(string); ok {
+		state.UserRole = types.StringValue(val)
+	}
+	if state.UserPassword.IsNull() || state.UserPassword.IsUnknown() || state.UserPassword.ValueString() == "" {
 		state.UserPassword = types.StringNull()
 	}
-	state.UserShellAccess = types.StringValue(redfishRequest.Oem.TSFujitsu.BaseValues.Shell)
-	state.UserRedfishEnabled = types.BoolValue(redfishRequest.Oem.TSFujitsu.BaseValues.Enabled)
-	state.UserLanChannelRole = types.StringValue(redfishRequest.Oem.TSFujitsu.Permissions.Standard.Lan)
-	state.UserSerialChannelRole = types.StringValue(redfishRequest.Oem.TSFujitsu.Permissions.Standard.Serial)
-	state.UserEnabledAccountConfig = types.BoolValue(redfishRequest.Oem.TSFujitsu.Permissions.Extended.ConfigureUsers)
-	state.UserEnabledIRMCSettingsConfig = types.BoolValue(redfishRequest.Oem.TSFujitsu.Permissions.Extended.ConfigureIrmc)
-	state.UserEnabledVideoRedirection = types.BoolValue(redfishRequest.Oem.TSFujitsu.Permissions.Extended.UseVideoRedirection)
-	state.UserEnabledRemoteStorage = types.BoolValue(redfishRequest.Oem.TSFujitsu.Permissions.Extended.UseRemoteStorage)
-	state.UserEnabledAlertChassisEvents = types.BoolValue(redfishRequest.Oem.TSFujitsu.Email.AlertChassisEventsUser)
+
+	var oemKey string
+	if isFsas {
+		oemKey = FSAS
+	} else {
+		oemKey = TS_FUJITSU
+	}
+
+	if oem, oemOK := data["Oem"].(map[string]interface{}); oemOK {
+		if oemData, oemDataOK := oem[oemKey].(map[string]interface{}); oemDataOK {
+			if baseValues, ok := oemData["BaseValues"].(map[string]interface{}); ok {
+				if val, ok := baseValues["Shell"].(string); ok {
+					state.UserShellAccess = types.StringValue(val)
+				}
+				if val, ok := baseValues["Enabled"].(bool); ok {
+					state.UserRedfishEnabled = types.BoolValue(val)
+				}
+			}
+			if permissions, ok := oemData["Permissions"].(map[string]interface{}); ok {
+				if standard, ok := permissions["Standard"].(map[string]interface{}); ok {
+					if val, ok := standard["Lan"].(string); ok {
+						state.UserLanChannelRole = types.StringValue(val)
+					}
+					if val, ok := standard["Serial"].(string); ok {
+						state.UserSerialChannelRole = types.StringValue(val)
+					}
+				}
+				if extended, ok := permissions["Extended"].(map[string]interface{}); ok {
+					if val, ok := extended["ConfigureUsers"].(bool); ok {
+						state.UserEnabledAccountConfig = types.BoolValue(val)
+					}
+					if val, ok := extended["ConfigureIrmc"].(bool); ok {
+						state.UserEnabledIRMCSettingsConfig = types.BoolValue(val)
+					}
+					if val, ok := extended["UseVideoRedirection"].(bool); ok {
+						state.UserEnabledVideoRedirection = types.BoolValue(val)
+					}
+					if val, ok := extended["UseRemoteStorage"].(bool); ok {
+						state.UserEnabledRemoteStorage = types.BoolValue(val)
+					}
+				}
+			}
+			if email, ok := oemData["Email"].(map[string]interface{}); ok {
+				if val, ok := email["AlertChassisEventsUser"].(bool); ok {
+					state.UserEnabledAlertChassisEvents = types.BoolValue(val)
+				}
+			}
+		}
+	}
 
 	diags = resp.State.Set(ctx, &state)
 	resp.Diagnostics.Append(diags...)
@@ -474,6 +493,12 @@ func (r *IrmcUserAccountResource) Update(ctx context.Context, req resource.Updat
 	}
 	defer config.Logout()
 
+	isFsas, err := IsFsasCheck(ctx, config)
+	if err != nil {
+		resp.Diagnostics.AddError("Vendor Detection Failed", err.Error())
+		return
+	}
+
 	userID := state.UserID.ValueString()
 	if userID == "" {
 		resp.Diagnostics.AddError("Missing User ID", "User ID is missing in the current state")
@@ -489,7 +514,7 @@ func (r *IrmcUserAccountResource) Update(ctx context.Context, req resource.Updat
 		}
 	}
 
-	updatePayload, err := InitializeUserAccountRedfishRequest(plan, Update)
+	updatePayload, err := InitializeUserAccountRedfishRequest(plan, Update, isFsas)
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to initialize update payload", err.Error())
 		return
@@ -503,7 +528,8 @@ func (r *IrmcUserAccountResource) Update(ctx context.Context, req resource.Updat
 		resp.Diagnostics.AddError("Error reading Redfish user account", err.Error())
 		return
 	}
-	defer respGet.Body.Close()
+
+	defer CloseResource(respGet.Body)
 
 	etag := respGet.Header.Get(HTTP_HEADER_ETAG)
 	if etag == "" {
@@ -518,7 +544,8 @@ func (r *IrmcUserAccountResource) Update(ctx context.Context, req resource.Updat
 		resp.Diagnostics.AddError("Error sending PATCH request", err.Error())
 		return
 	}
-	defer respPatch.Body.Close()
+
+	defer CloseResource(respPatch.Body)
 
 	if respPatch.StatusCode != http.StatusOK && respPatch.StatusCode != http.StatusNoContent {
 		resp.Diagnostics.AddError("User Account Update PATCH request failed", fmt.Sprintf("Received status code: %d", respPatch.StatusCode))
@@ -529,7 +556,8 @@ func (r *IrmcUserAccountResource) Update(ctx context.Context, req resource.Updat
 		resp.Diagnostics.AddError("error. Not able to read updated Redfish user account", err.Error())
 		return
 	}
-	defer respGet.Body.Close()
+
+	defer CloseResource(respGet.Body)
 
 	if respGet.StatusCode == http.StatusNotFound {
 		resp.State.RemoveResource(ctx)
@@ -539,30 +567,78 @@ func (r *IrmcUserAccountResource) Update(ctx context.Context, req resource.Updat
 		return
 	}
 
-	var redfishRequest RedfishRequest
-	err = json.NewDecoder(respGet.Body).Decode(&redfishRequest)
+	var data map[string]interface{}
+	err = json.NewDecoder(respGet.Body).Decode(&data)
 	if err != nil {
 		resp.Diagnostics.AddError("error. Decoding JSON from Redfish user account response failed", err.Error())
 		return
 	}
-	state.UserEnabled = types.BoolValue(redfishRequest.Enabled)
-	state.UserUsername = types.StringValue(redfishRequest.UserName)
-	state.UserRole = types.StringValue(redfishRequest.RoleId)
-	if state.UserPassword.IsNull() || state.UserPassword.String() == "" {
-		state.UserPassword = types.StringNull()
-	}
-	state.UserShellAccess = types.StringValue(redfishRequest.Oem.TSFujitsu.BaseValues.Shell)
-	state.UserRedfishEnabled = types.BoolValue(redfishRequest.Oem.TSFujitsu.BaseValues.Enabled)
-	state.UserLanChannelRole = types.StringValue(redfishRequest.Oem.TSFujitsu.Permissions.Standard.Lan)
-	state.UserSerialChannelRole = types.StringValue(redfishRequest.Oem.TSFujitsu.Permissions.Standard.Serial)
-	state.UserEnabledAccountConfig = types.BoolValue(redfishRequest.Oem.TSFujitsu.Permissions.Extended.ConfigureUsers)
-	state.UserEnabledIRMCSettingsConfig = types.BoolValue(redfishRequest.Oem.TSFujitsu.Permissions.Extended.ConfigureIrmc)
-	state.UserEnabledVideoRedirection = types.BoolValue(redfishRequest.Oem.TSFujitsu.Permissions.Extended.UseVideoRedirection)
-	state.UserEnabledRemoteStorage = types.BoolValue(redfishRequest.Oem.TSFujitsu.Permissions.Extended.UseRemoteStorage)
-	state.UserEnabledAlertChassisEvents = types.BoolValue(redfishRequest.Oem.TSFujitsu.Email.AlertChassisEventsUser)
-	state.Id = types.StringValue(fmt.Sprintf("%s/%s", USER_ACCOUNT_ENDPOINT, userID))
 
-	diags = resp.State.Set(ctx, &state)
+	if val, ok := data["Enabled"].(bool); ok {
+		plan.UserEnabled = types.BoolValue(val)
+	}
+	if val, ok := data["UserName"].(string); ok {
+		plan.UserUsername = types.StringValue(val)
+	}
+	if val, ok := data["RoleId"].(string); ok {
+		plan.UserRole = types.StringValue(val)
+	}
+	if plan.UserPassword.IsNull() || plan.UserPassword.IsUnknown() || plan.UserPassword.ValueString() == "" {
+		plan.UserPassword = types.StringNull()
+	}
+
+	var oemKey string
+	if isFsas {
+		oemKey = FSAS
+	} else {
+		oemKey = TS_FUJITSU
+	}
+
+	if oem, oemOK := data["Oem"].(map[string]interface{}); oemOK {
+		if oemData, oemDataOK := oem[oemKey].(map[string]interface{}); oemDataOK {
+			if baseValues, ok := oemData["BaseValues"].(map[string]interface{}); ok {
+				if val, ok := baseValues["Shell"].(string); ok {
+					plan.UserShellAccess = types.StringValue(val)
+				}
+				if val, ok := baseValues["Enabled"].(bool); ok {
+					plan.UserRedfishEnabled = types.BoolValue(val)
+				}
+			}
+			if permissions, ok := oemData["Permissions"].(map[string]interface{}); ok {
+				if standard, ok := permissions["Standard"].(map[string]interface{}); ok {
+					if val, ok := standard["Lan"].(string); ok {
+						plan.UserLanChannelRole = types.StringValue(val)
+					}
+					if val, ok := standard["Serial"].(string); ok {
+						plan.UserSerialChannelRole = types.StringValue(val)
+					}
+				}
+				if extended, ok := permissions["Extended"].(map[string]interface{}); ok {
+					if val, ok := extended["ConfigureUsers"].(bool); ok {
+						plan.UserEnabledAccountConfig = types.BoolValue(val)
+					}
+					if val, ok := extended["ConfigureIrmc"].(bool); ok {
+						plan.UserEnabledIRMCSettingsConfig = types.BoolValue(val)
+					}
+					if val, ok := extended["UseVideoRedirection"].(bool); ok {
+						plan.UserEnabledVideoRedirection = types.BoolValue(val)
+					}
+					if val, ok := extended["UseRemoteStorage"].(bool); ok {
+						plan.UserEnabledRemoteStorage = types.BoolValue(val)
+					}
+				}
+			}
+			if email, ok := oemData["Email"].(map[string]interface{}); ok {
+				if val, ok := email["AlertChassisEventsUser"].(bool); ok {
+					plan.UserEnabledAlertChassisEvents = types.BoolValue(val)
+				}
+			}
+		}
+	}
+	plan.UserID = state.UserID
+	plan.Id = types.StringValue(fmt.Sprintf("%s/%s", USER_ACCOUNT_ENDPOINT, userID))
+
+	diags = resp.State.Set(ctx, &plan)
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
 		return
@@ -601,7 +677,8 @@ func (r *IrmcUserAccountResource) Delete(ctx context.Context, req resource.Delet
 		resp.Diagnostics.AddError("Error sending DELETE request", err.Error())
 		return
 	}
-	defer respDelete.Body.Close()
+
+	defer CloseResource(respDelete.Body)
 
 	if respDelete.StatusCode != http.StatusOK && respDelete.StatusCode != http.StatusNoContent {
 		resp.Diagnostics.AddError("User Account Delete DELETE request failed", fmt.Sprintf("Received status code: %d", respDelete.StatusCode))
@@ -716,68 +793,56 @@ func CheckUserIDExistence(accounts []*redfish.ManagerAccount, userID string) err
 	return nil
 }
 
-func InitializeUserAccountRedfishRequest(plan models.IrmcUserAccountResourceModel, redfishMethod RedfishMethod) (map[string]interface{}, error) {
+func InitializeUserAccountRedfishRequest(plan models.IrmcUserAccountResourceModel, redfishMethod RedfishMethod, isFsas bool) (map[string]interface{}, error) {
+	var oemKey string
+	if isFsas {
+		oemKey = FSAS
+	} else {
+		oemKey = TS_FUJITSU
+	}
 
-	if redfishMethod == Create {
+	oemPayload := map[string]interface{}{
+		"BaseValues": map[string]interface{}{
+			"Enabled": plan.UserRedfishEnabled.ValueBool(),
+			"Shell":   plan.UserShellAccess.ValueString(),
+		},
+		"Permissions": map[string]interface{}{
+			"Standard": map[string]interface{}{
+				"Lan":    plan.UserLanChannelRole.ValueString(),
+				"Serial": plan.UserSerialChannelRole.ValueString(),
+			},
+			"Extended": map[string]interface{}{
+				"ConfigureUsers":      plan.UserEnabledAccountConfig.ValueBool(),
+				"ConfigureIrmc":       plan.UserEnabledIRMCSettingsConfig.ValueBool(),
+				"UseVideoRedirection": plan.UserEnabledVideoRedirection.ValueBool(),
+				"UseRemoteStorage":    plan.UserEnabledRemoteStorage.ValueBool(),
+			},
+		},
+		"Email": map[string]interface{}{
+			"AlertChassisEventsUser": plan.UserEnabledAlertChassisEvents.ValueBool(),
+		},
+	}
+
+	switch redfishMethod {
+	case Create:
 		redfishRequest := map[string]interface{}{
 			"UserName": plan.UserUsername.ValueString(),
 			"Password": plan.UserPassword.ValueString(),
 			"RoleId":   plan.UserRole.ValueString(),
 			"Enabled":  plan.UserEnabled.ValueBool(),
-			"Oem": map[string]interface{}{
-				"ts_fujitsu": map[string]interface{}{
-					"BaseValues": map[string]interface{}{
-						"Enabled": plan.UserRedfishEnabled.ValueBool(),
-						"Shell":   plan.UserShellAccess.ValueString(),
-					},
-					"Permissions": map[string]interface{}{
-						"Standard": map[string]interface{}{
-							"Lan":    plan.UserLanChannelRole.ValueString(),
-							"Serial": plan.UserSerialChannelRole.ValueString(),
-						},
-						"Extended": map[string]interface{}{
-							"ConfigureUsers":      plan.UserEnabledAccountConfig.ValueBool(),
-							"ConfigureIrmc":       plan.UserEnabledIRMCSettingsConfig.ValueBool(),
-							"UseVideoRedirection": plan.UserEnabledVideoRedirection.ValueBool(),
-							"UseRemoteStorage":    plan.UserEnabledRemoteStorage.ValueBool(),
-						},
-					},
-					"Email": map[string]interface{}{
-						"AlertChassisEventsUser": plan.UserEnabledAlertChassisEvents.ValueBool(),
-					},
-				},
-			},
+			"Oem":      map[string]interface{}{oemKey: oemPayload},
 		}
 		return redfishRequest, nil
 
-	} else if redfishMethod == Update {
+	case Update:
 		redfishRequest := map[string]interface{}{
 			"UserName": plan.UserUsername.ValueString(),
 			"Enabled":  plan.UserEnabled.ValueBool(),
 			"RoleId":   plan.UserRole.ValueString(),
-			"Oem": map[string]interface{}{
-				"ts_fujitsu": map[string]interface{}{
-					"BaseValues": map[string]interface{}{
-						"Enabled": plan.UserRedfishEnabled.ValueBool(),
-						"Shell":   plan.UserShellAccess.ValueString(),
-					},
-					"Permissions": map[string]interface{}{
-						"Standard": map[string]interface{}{
-							"Lan":    plan.UserLanChannelRole.ValueString(),
-							"Serial": plan.UserSerialChannelRole.ValueString(),
-						},
-						"Extended": map[string]interface{}{
-							"ConfigureUsers":      plan.UserEnabledAccountConfig.ValueBool(),
-							"ConfigureIrmc":       plan.UserEnabledIRMCSettingsConfig.ValueBool(),
-							"UseVideoRedirection": plan.UserEnabledVideoRedirection.ValueBool(),
-							"UseRemoteStorage":    plan.UserEnabledRemoteStorage.ValueBool(),
-						},
-					},
-					"Email": map[string]interface{}{
-						"AlertChassisEventsUser": plan.UserEnabledAlertChassisEvents.ValueBool(),
-					},
-				},
-			},
+			"Oem":      map[string]interface{}{oemKey: oemPayload},
+		}
+		if !plan.UserPassword.IsNull() && !plan.UserPassword.IsUnknown() && plan.UserPassword.ValueString() != "" {
+			redfishRequest["Password"] = plan.UserPassword.ValueString()
 		}
 		return redfishRequest, nil
 	}

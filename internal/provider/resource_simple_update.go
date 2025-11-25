@@ -181,6 +181,12 @@ func (r *SimpleUpdateResource) Create(ctx context.Context, req resource.CreateRe
 	}
 	defer config.Logout()
 
+	isFsas, err := IsFsasCheck(ctx, config)
+	if err != nil {
+		resp.Diagnostics.AddError("Vendor Detection Failed", err.Error())
+		return
+	}
+
 	plan.Id = types.StringValue(SIMPLE_UPDATE_ENDPOINT)
 
 	poweredOn, err := isPoweredOn(config.Service)
@@ -188,7 +194,7 @@ func (r *SimpleUpdateResource) Create(ctx context.Context, req resource.CreateRe
 		resp.Diagnostics.AddError("Power state check failed", err.Error())
 		return
 	}
-	err = UpdateUmeToolsDirName(config, plan.UmeToolDirName.ValueString())
+	err = UpdateUmeToolsDirName(config, plan.UmeToolDirName.ValueString(), isFsas)
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to update SimpleUpdateOfflineToolsDirName", err.Error())
 		return
@@ -212,7 +218,7 @@ func (r *SimpleUpdateResource) Create(ctx context.Context, req resource.CreateRe
 		return
 	}
 
-	err = CheckSimpleUpdateStatus(ctx, config.Service, taskLocation, plan.UpdateTimeout.ValueInt64())
+	err = CheckSimpleUpdateStatus(ctx, config.Service, taskLocation, plan.UpdateTimeout.ValueInt64(), isFsas)
 	if err != nil {
 		resp.Diagnostics.AddError("Simple Update task did not complete successfully", err.Error())
 		return
@@ -255,10 +261,10 @@ func (r *SimpleUpdateResource) Delete(ctx context.Context, req resource.DeleteRe
 	tflog.Info(ctx, "resource-simple-update: delete ends")
 }
 
-func CheckSimpleUpdateStatus(ctx context.Context, service *gofish.Service, location string, timeout int64) error {
+func CheckSimpleUpdateStatus(ctx context.Context, service *gofish.Service, location string, timeout int64, isFsas bool) error {
 	finishedSuccessfully, err := WaitForRedfishTaskEnd(ctx, service, location, timeout)
 	if err != nil || !finishedSuccessfully {
-		taskLog, diags := FetchRedfishTaskLog(service, location)
+		taskLog, diags := FetchRedfishTaskLog(service, location, isFsas)
 		if diags.HasError() {
 			return fmt.Errorf("simple Update task did not complete successfully: %s", err)
 		}
@@ -280,7 +286,8 @@ func ConfigSimpleUpd(ctx context.Context, config *gofish.APIClient, updateImage 
 		diags.AddError("Simple Update POST request failed", err.Error())
 		return "", diags
 	}
-	defer resp.Body.Close()
+
+	defer CloseResource(resp.Body)
 
 	if resp.StatusCode != http.StatusAccepted {
 		diags.AddError("Simple Update request not accepted", fmt.Sprintf("unexpected status code: %d", resp.StatusCode))
@@ -296,36 +303,43 @@ func ConfigSimpleUpd(ctx context.Context, config *gofish.APIClient, updateImage 
 	return taskLocation, diags
 }
 
-type UpdateServiceResponse struct {
-	Oem struct {
-		TsFujitsu struct {
-			SimpleUpdateOfflineToolsDirName string `json:"SimpleUpdateOfflineToolsDirName"`
-		} `json:"ts_fujitsu"`
-	} `json:"Oem"`
-}
-
-func UpdateUmeToolsDirName(apiClient *gofish.APIClient, umeFileDirectory string) error {
+func UpdateUmeToolsDirName(apiClient *gofish.APIClient, umeFileDirectory string, isFsas bool) error {
 	res, err := apiClient.Get(UPDATE_SERVICE_ENDPOINT)
 	if err != nil {
 		return fmt.Errorf("failed to fetch data from Redfish endpoint: %v", err)
 	}
-	defer res.Body.Close()
 
-	var updateService UpdateServiceResponse
-	decoder := json.NewDecoder(res.Body)
-	err = decoder.Decode(&updateService)
+	defer CloseResource(res.Body)
+
+	var dataUpdateService map[string]interface{}
+	err = json.NewDecoder(res.Body).Decode(&dataUpdateService)
 	if err != nil {
 		return fmt.Errorf("failed to parse JSON response: %v", err)
 	}
 
-	currentDirName := updateService.Oem.TsFujitsu.SimpleUpdateOfflineToolsDirName
+	var oemKey string
+	if isFsas {
+		oemKey = FSAS
+	} else {
+		oemKey = TS_FUJITSU
+	}
+
+	currentDirName := ""
+	if oem, oemOK := dataUpdateService["Oem"].(map[string]interface{}); oemOK {
+		if oemData, oemDataOK := oem[oemKey].(map[string]interface{}); oemDataOK {
+			if val, ok := oemData["SimpleUpdateOfflineToolsDirName"].(string); ok {
+				currentDirName = val
+			}
+		}
+	}
+
 	if currentDirName == umeFileDirectory {
 		return nil
 	}
 
 	patchData := map[string]interface{}{
 		"Oem": map[string]interface{}{
-			"ts_fujitsu": map[string]interface{}{
+			oemKey: map[string]interface{}{
 				"SimpleUpdateOfflineToolsDirName": umeFileDirectory,
 			},
 		},
@@ -336,7 +350,8 @@ func UpdateUmeToolsDirName(apiClient *gofish.APIClient, umeFileDirectory string)
 	if err != nil {
 		return fmt.Errorf("failed to send PATCH request: %v", err)
 	}
-	defer res.Body.Close()
+
+	defer CloseResource(res.Body)
 
 	if res.StatusCode != http.StatusOK && res.StatusCode != http.StatusNoContent {
 		return fmt.Errorf("PATCH request failed with status code: %d", res.StatusCode)

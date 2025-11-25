@@ -49,7 +49,9 @@ type PowerResource struct {
 	p *IrmcProvider
 }
 
-const HOST_POWER_ACTION_ENDPOINT = "/redfish/v1/Systems/0/Actions/Oem/FTSComputerSystem.Reset"
+type powerEndpoints struct {
+	hostPowerActionEndpoint string
+}
 
 func (*PowerResource) Metadata(_ context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
 	resp.TypeName = req.ProviderTypeName + "power"
@@ -146,8 +148,8 @@ func (r *PowerResource) Create(ctx context.Context, req resource.CreateRequest, 
 	}
 
 	// Provide synchronization
-	var endpoint string = powerPlan.RedfishServer[0].Endpoint.ValueString()
-	var resource_name string = "resource-power"
+	var endpoint = powerPlan.RedfishServer[0].Endpoint.ValueString()
+	var resource_name = "resource-power"
 	mutexPool.Lock(ctx, endpoint, resource_name)
 	defer mutexPool.Unlock(ctx, endpoint, resource_name)
 
@@ -165,6 +167,15 @@ func (r *PowerResource) Create(ctx context.Context, req resource.CreateRequest, 
 	powerPlan.Id = types.StringValue(system.ID)
 
 	defer config.Logout()
+
+	isFsas, err := IsFsasCheck(ctx, config)
+	if err != nil {
+		resp.Diagnostics.AddError("Vendor Detection Failed", err.Error())
+		return
+	}
+
+	powerEndpoint := getPowerEndpoints(isFsas)
+
 	var powerErr error
 
 	powerAction := powerPlan.HostPowerAction.ValueString()
@@ -177,15 +188,24 @@ func (r *PowerResource) Create(ctx context.Context, req resource.CreateRequest, 
 		powerErr = changePowerState(config.Service, false, powerPlan.MaxWaitTime.ValueInt64())
 
 	case "PowerCycle":
-		payload := map[string]string{
-			"FTSResetType": "PowerCycle",
+		var payload map[string]string
+		if isFsas {
+			payload = map[string]string{
+				"FsasResetType": "PowerCycle",
+			}
+		} else {
+			payload = map[string]string{
+				"FTSResetType": "PowerCycle",
+			}
 		}
-		respPost, err := config.Post(HOST_POWER_ACTION_ENDPOINT, payload)
+
+		respPost, err := config.Post(powerEndpoint.hostPowerActionEndpoint, payload)
 		if err != nil {
 			resp.Diagnostics.AddError("PowerCycle POST request failed", err.Error())
 			return
 		}
-		defer respPost.Body.Close()
+
+		defer CloseResource(respPost.Body)
 
 		if respPost.StatusCode != http.StatusNoContent {
 			resp.Diagnostics.AddError("PowerCycle POST request failed - ", fmt.Sprintf("Received status code: %d", respPost.StatusCode))
@@ -285,4 +305,16 @@ func (*PowerResource) Delete(ctx context.Context, req resource.DeleteRequest, re
 	tflog.Info(ctx, "resource-power: delete starts")
 	resp.State.RemoveResource(ctx)
 	tflog.Info(ctx, "resource-power: delete ends")
+}
+
+func getPowerEndpoints(isFsas bool) powerEndpoints {
+	if isFsas {
+		return powerEndpoints{
+			hostPowerActionEndpoint: fmt.Sprintf("/redfish/v1/Systems/0/Actions/Oem/%sComputerSystem.Reset", FSAS),
+		}
+	} else {
+		return powerEndpoints{
+			hostPowerActionEndpoint: fmt.Sprintf("/redfish/v1/Systems/0/Actions/Oem/%sComputerSystem.Reset", FTS),
+		}
+	}
 }

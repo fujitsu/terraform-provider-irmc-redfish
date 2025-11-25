@@ -37,11 +37,14 @@ import (
 )
 
 const (
-	CERTIFICATE_ENDPOINT         = "/redfish/v1/Managers/iRMC/Oem/ts_fujitsu/iRMCConfiguration/CertificationAuthority"
 	CERTIFICATE_UPLOAD_TYPE      = "certificate_upload_type"
 	CERTIFICATE_UPLOAD_TYPE_FILE = "File"
 	CERTIFICATE_UPLOAD_TYPE_TEXT = "Text"
 )
+
+type certCaUpdDeployEndpoints struct {
+	certificateEndpoint string
+}
 
 // Ensure provider defined types fully satisfy framework interfaces.
 var _ resource.Resource = &IrmcCertificateCaUpdDeployResource{}
@@ -142,8 +145,8 @@ func (r *IrmcCertificateCaUpdDeployResource) Create(ctx context.Context, req res
 	}
 
 	// Provide synchronization
-	var endpoint string = plan.RedfishServer[0].Endpoint.ValueString()
-	var resource_name string = "certificate_ca_upd_deploy"
+	var endpoint = plan.RedfishServer[0].Endpoint.ValueString()
+	var resource_name = "certificate_ca_upd_deploy"
 	mutexPool.Lock(ctx, endpoint, resource_name)
 	defer mutexPool.Unlock(ctx, endpoint, resource_name)
 
@@ -154,15 +157,23 @@ func (r *IrmcCertificateCaUpdDeployResource) Create(ctx context.Context, req res
 	}
 	defer api.Logout()
 
+	isFsas, err := IsFsasCheck(ctx, api)
+	if err != nil {
+		resp.Diagnostics.AddError("Vendor Detection Failed", err.Error())
+		return
+	}
+
+	endp := getCertCaUpdDeployEndpoints(isFsas)
+
 	switch plan.CertificateUploadType.ValueString() {
 	case CERTIFICATE_UPLOAD_TYPE_FILE:
-		err := handleFileCertificate(api, &plan)
+		err := handleFileCertificate(api, &plan, endp.certificateEndpoint)
 		if err != nil {
 			resp.Diagnostics.AddError("File Certificate Upload failed.", err.Error())
 			return
 		}
 	case CERTIFICATE_UPLOAD_TYPE_TEXT:
-		err := handleTextCertificate(api, &plan)
+		err := handleTextCertificate(api, &plan, endp.certificateEndpoint)
 		if err != nil {
 			resp.Diagnostics.AddError("Text Certificate Upload failed.", err.Error())
 			return
@@ -234,7 +245,8 @@ func (r *IrmcCertificateCaUpdDeployResource) Delete(ctx context.Context, req res
 		resp.Diagnostics.AddError("Failed to delete certificate", err.Error())
 		return
 	}
-	defer deleteRes.Body.Close()
+
+	defer CloseResource(deleteRes.Body)
 
 	if deleteRes.StatusCode != http.StatusOK && deleteRes.StatusCode != http.StatusNoContent {
 		responseBody, _ := io.ReadAll(deleteRes.Body)
@@ -247,18 +259,19 @@ func (r *IrmcCertificateCaUpdDeployResource) Delete(ctx context.Context, req res
 	tflog.Info(ctx, "resource-certificate-ca-upd-deploy: delete ends")
 }
 
-func handleFileCertificate(api *gofish.APIClient, plan *models.CertificateCaUpdDeployResourceModel) error {
+func handleFileCertificate(api *gofish.APIClient, plan *models.CertificateCaUpdDeployResourceModel, certificateEndpoint string) error {
 
 	fileContent, err := os.ReadFile(plan.CertificateFile.ValueString())
 	if err != nil {
 		return fmt.Errorf("could not read certificate file: %w", err)
 	}
 
-	res, err := api.Post(CERTIFICATE_ENDPOINT, string(fileContent))
+	res, err := api.Post(certificateEndpoint, string(fileContent))
 	if err != nil {
 		return fmt.Errorf("failed to upload certificate file: %w", err)
 	}
-	defer res.Body.Close()
+
+	defer CloseResource(res.Body)
 
 	if res.StatusCode != http.StatusOK && res.StatusCode != http.StatusAccepted && res.StatusCode != http.StatusCreated {
 		responseBody, _ := io.ReadAll(res.Body)
@@ -272,18 +285,19 @@ func handleFileCertificate(api *gofish.APIClient, plan *models.CertificateCaUpdD
 	return nil
 }
 
-func handleTextCertificate(api *gofish.APIClient, plan *models.CertificateCaUpdDeployResourceModel) error {
+func handleTextCertificate(api *gofish.APIClient, plan *models.CertificateCaUpdDeployResourceModel, certificateEndpoint string) error {
 
 	certificateContent := plan.CertificateText.ValueString()
 	if certificateContent == "" {
 		return fmt.Errorf("certificate text is empty")
 	}
 
-	res, err := api.Post(CERTIFICATE_ENDPOINT, certificateContent)
+	res, err := api.Post(certificateEndpoint, certificateContent)
 	if err != nil {
 		return fmt.Errorf("failed to upload certificate text: %w", err)
 	}
-	defer res.Body.Close()
+
+	defer CloseResource(res.Body)
 
 	if res.StatusCode != http.StatusOK && res.StatusCode != http.StatusAccepted && res.StatusCode != http.StatusCreated {
 		responseBody, _ := io.ReadAll(res.Body)
@@ -295,4 +309,16 @@ func handleTextCertificate(api *gofish.APIClient, plan *models.CertificateCaUpdD
 	}
 	plan.Id = types.StringValue(taskLocation)
 	return nil
+}
+
+func getCertCaUpdDeployEndpoints(isFsas bool) certCaUpdDeployEndpoints {
+	if isFsas {
+		return certCaUpdDeployEndpoints{
+			certificateEndpoint: fmt.Sprintf("/redfish/v1/Managers/iRMC/Oem/%s/iRMCConfiguration/CertificationAuthority", FSAS),
+		}
+	} else {
+		return certCaUpdDeployEndpoints{
+			certificateEndpoint: fmt.Sprintf("/redfish/v1/Managers/iRMC/Oem/%s/iRMCConfiguration/CertificationAuthority", TS_FUJITSU),
+		}
+	}
 }

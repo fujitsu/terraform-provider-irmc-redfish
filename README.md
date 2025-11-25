@@ -14,9 +14,9 @@ See the License for the specific language governing permissions and
 limitations under the License.
 -->
 
-# Terraform Provider for iRMC Fujitsu Redfish API
+# Terraform Provider for iRMC FSAS Redfish API
 
-The Terraform provider allows control and management over Fujitsu servers equipped with iRMC.
+The Terraform provider allows control and management over Fsas servers equipped with iRMC.
 
 ## Table of contents
 * [License](#license)
@@ -30,6 +30,7 @@ The provider is released and licensed under the MPL-2.0 license. See [License](L
 ## Prerequisites
 - [Terraform](https://developer.hashicorp.com/terraform/downloads) >= 1.0
 - [Go](https://golang.org/doc/install) >= 1.21
+- PRIMERGY system iRMCS6-based generations: M7, M2 (AMD), monoM6 and M8
 
 ## List of supported data sources
 * [Bios](docs/data-sources/bios.md)

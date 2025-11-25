@@ -52,10 +52,11 @@ type StorageVolumeResource struct {
 }
 
 const (
-	STORAGE_COLLECTION_ENDPOINT        = "/redfish/v1/Systems/0/Storage"
-	STORAGE_RAIDCAPABILITIES_SUFFIX    = "/Oem/ts_fujitsu/RAIDCapabilities"
-	STORAGE_VOLUME_RESOURCE_NAME       = "resource-storage_volume"
-	STORAGE_VOLUME_JOB_DEFAULT_TIMEOUT = 300
+	STORAGE_COLLECTION_ENDPOINT          = "/redfish/v1/Systems/0/Storage"
+	STORAGE_RAIDCAPABILITIES_SUFFIX      = "/Oem/ts_fujitsu/RAIDCapabilities"
+	STORAGE_RAIDCAPABILITIES_FSAS_SUFFIX = "/Oem/Fsas/RAIDCapabilities"
+	STORAGE_VOLUME_RESOURCE_NAME         = "resource-storage_volume"
+	STORAGE_VOLUME_JOB_DEFAULT_TIMEOUT   = 300
 )
 
 func (r *StorageVolumeResource) Metadata(ctx context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
@@ -272,7 +273,7 @@ func (r *StorageVolumeResource) Create(ctx context.Context, req resource.CreateR
 	}
 
 	// Provide synchronization
-	var endpoint string = plan.RedfishServer[0].Endpoint.ValueString()
+	var endpoint = plan.RedfishServer[0].Endpoint.ValueString()
 	mutexPool.Lock(ctx, endpoint, STORAGE_VOLUME_RESOURCE_NAME)
 	defer mutexPool.Unlock(ctx, endpoint, STORAGE_VOLUME_RESOURCE_NAME)
 
@@ -285,7 +286,7 @@ func (r *StorageVolumeResource) Create(ctx context.Context, req resource.CreateR
 	defer api.Logout()
 
 	var state models.StorageVolumeResourceModel
-	beRemoved, diags := createStorageVolume(ctx, api.Service, plan, &state)
+	beRemoved, diags := createStorageVolume(ctx, api, plan, &state)
 	if beRemoved {
 		resp.State.RemoveResource(ctx)
 		return
@@ -379,7 +380,7 @@ func (r *StorageVolumeResource) Update(ctx context.Context, req resource.UpdateR
 	}
 
 	// Provide synchronization
-	var endpoint string = plan.RedfishServer[0].Endpoint.ValueString()
+	var endpoint = plan.RedfishServer[0].Endpoint.ValueString()
 	mutexPool.Lock(ctx, endpoint, STORAGE_VOLUME_RESOURCE_NAME)
 	defer mutexPool.Unlock(ctx, endpoint, STORAGE_VOLUME_RESOURCE_NAME)
 
@@ -392,7 +393,7 @@ func (r *StorageVolumeResource) Update(ctx context.Context, req resource.UpdateR
 
 	defer api.Logout()
 
-	beRemoved, diags := updateStorageVolume(ctx, api.Service, plan, &state)
+	beRemoved, diags := updateStorageVolume(ctx, api, plan, &state)
 	if beRemoved {
 		resp.State.RemoveResource(ctx)
 		return
@@ -421,7 +422,7 @@ func (r *StorageVolumeResource) Delete(ctx context.Context, req resource.DeleteR
 	}
 
 	// Provide synchronization
-	var endpoint string = state.RedfishServer[0].Endpoint.ValueString()
+	var endpoint = state.RedfishServer[0].Endpoint.ValueString()
 	mutexPool.Lock(ctx, endpoint, STORAGE_VOLUME_RESOURCE_NAME)
 	defer mutexPool.Unlock(ctx, endpoint, STORAGE_VOLUME_RESOURCE_NAME)
 
@@ -434,8 +435,14 @@ func (r *StorageVolumeResource) Delete(ctx context.Context, req resource.DeleteR
 
 	defer api.Logout()
 
+	is_fsas, err := IsFsasCheck(ctx, api)
+	if err != nil {
+		resp.Diagnostics.AddError("Vendor detection failed: ", err.Error())
+		return
+	}
+
 	// Try to delete handled volume
-	diags = deleteStorageVolume(ctx, api.Service, state.Id.ValueString())
+	diags = deleteStorageVolume(ctx, api.Service, state.Id.ValueString(), is_fsas, state.JobTimeout.ValueInt64())
 	resp.Diagnostics.Append(diags...)
 
 	if diags.HasError() {

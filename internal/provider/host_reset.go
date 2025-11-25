@@ -75,11 +75,12 @@ func waitUntilHostStateChanged(service *gofish.Service, expectedPoweredOn bool, 
 }
 
 type tsBiosObject struct {
-	IsBiosInPOSTPhase bool `json:"IsBiosInPostPhase"`
+	IsBiosInPOST *bool `json:"IsBiosInPostPhase,omitempty"`
 }
 
 type biosOemObject struct {
-	Ts_fujitsu tsBiosObject `json:"ts_fujitsu"`
+	OemFujitsu tsBiosObject `json:"ts_fujitsu"`
+	OemFsas    tsBiosObject `json:"Fsas"`
 }
 
 type biosObject struct {
@@ -94,7 +95,7 @@ func isBiosInPOSTPhase(service *gofish.Service) (bool, error) {
 		return false, err
 	}
 
-	defer res.Body.Close()
+	defer CloseResource(res.Body)
 
 	if res.StatusCode != http.StatusOK {
 		return false, fmt.Errorf("unexpected status code: %d", res.StatusCode)
@@ -111,7 +112,15 @@ func isBiosInPOSTPhase(service *gofish.Service) (bool, error) {
 		return false, err
 	}
 
-	return config.Oem.Ts_fujitsu.IsBiosInPOSTPhase, nil
+	if config.Oem.OemFujitsu.IsBiosInPOST != nil {
+		return *config.Oem.OemFujitsu.IsBiosInPOST, nil
+	} else {
+		if config.Oem.OemFsas.IsBiosInPOST != nil {
+			return *config.Oem.OemFsas.IsBiosInPOST, nil
+		} else {
+			return false, fmt.Errorf("could not find IsBiosInPostPhase object")
+		}
+	}
 }
 
 // waitUntilHostStateChangedEnhanced waits until host will change its state
@@ -126,6 +135,9 @@ func waitUntilHostStateChangedEnhanced(service *gofish.Service, expectedPoweredO
 	for {
 		// wait until BIOS will report POST state
 		for {
+			if time.Now().Unix()-startTime > timeout {
+				return fmt.Errorf("operation not finished within given timeout %d (waiting for POST to start)", timeout)
+			}
 			biosDuringPOST, err := isBiosInPOSTPhase(service)
 			if err != nil {
 				return err
@@ -135,37 +147,55 @@ func waitUntilHostStateChangedEnhanced(service *gofish.Service, expectedPoweredO
 				break
 			} else {
 				time.Sleep(time.Second)
-
-				if time.Now().Unix()-startTime > timeout {
-					return fmt.Errorf("BIOS did not entered POST within given timeout %d", timeout)
-				}
 			}
 		}
 
 		// wait until BIOS will stop report POST state and host will be still on
 		for {
+			if time.Now().Unix()-startTime > timeout {
+				return fmt.Errorf("operation not finished within given timeout %d (waiting for POST to end)", timeout)
+			}
 			biosDuringPOST, err := isBiosInPOSTPhase(service)
 			if err != nil {
 				return err
 			}
 
 			if !biosDuringPOST {
-				isPoweredOn, err := isPoweredOn(service)
+				isSystemPoweredOn, err := isPoweredOn(service)
 				if err != nil {
 					return err
 				}
 
-				if isPoweredOn {
+				if isSystemPoweredOn {
 					return nil
 				} else {
-					return fmt.Errorf("BIOS exited POST but host powered off")
+					const restartWaitSeconds = 20
+					restartDeadline := time.Now().Unix() + restartWaitSeconds
+					didPowerOnInTime := false
+
+					for time.Now().Unix() < restartDeadline {
+						if time.Now().Unix()-startTime > timeout {
+							break
+						}
+						powerStateAfterPost, err := isPoweredOn(service)
+						if err != nil {
+							return err
+						}
+						if powerStateAfterPost {
+							didPowerOnInTime = true
+							break
+						}
+						time.Sleep(2 * time.Second)
+					}
+
+					if didPowerOnInTime {
+						break
+					} else {
+						return fmt.Errorf("BIOS exited POST but host powered off")
+					}
 				}
 			} else {
 				time.Sleep(2 * time.Second)
-			}
-
-			if time.Now().Unix()-startTime > timeout {
-				return fmt.Errorf("operation not finished within given timeout %d", timeout)
 			}
 		}
 	}
@@ -224,11 +254,7 @@ func resetHost(service *gofish.Service, resetType redfish.ResetType, timeout int
 		return err
 	}
 
-	expectedTargetState := true
-	if resetType == redfish.GracefulShutdownResetType || resetType == redfish.PushPowerButtonResetType {
-		// Assumption: host is powered on if someone requested reset
-		expectedTargetState = false
-	}
+	expectedTargetState := resetType != redfish.GracefulShutdownResetType && resetType != redfish.PushPowerButtonResetType
 
 	err = waitUntilHostStateChangedEnhanced(service, expectedTargetState, timeout)
 	if err != nil {

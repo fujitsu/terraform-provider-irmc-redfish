@@ -168,7 +168,8 @@ func GetFirmwareInventoryList(api *gofish.APIClient) ([]models.Inventory, error)
 	if err != nil {
 		return nil, fmt.Errorf("error getting firmware inventory list: %w", err)
 	}
-	defer res.Body.Close()
+
+	defer CloseResource(res.Body)
 
 	if res.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("unexpected status code: %d", res.StatusCode)
@@ -204,7 +205,8 @@ func GetFirmwareInventoryDetail(api *gofish.APIClient, endpoint string) (models.
 	if err != nil {
 		return models.Inventory{}, fmt.Errorf("error getting firmware inventory detail: %w", err)
 	}
-	defer res.Body.Close()
+
+	defer CloseResource(res.Body)
 
 	if res.StatusCode != http.StatusOK {
 		return models.Inventory{}, fmt.Errorf("unexpected status code: %d", res.StatusCode)

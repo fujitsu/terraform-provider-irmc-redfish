@@ -74,12 +74,12 @@ func (v CapacityByteValue) Int64SemanticEquals(_ context.Context, newValueable b
 		return false, diags
 	}
 
-	diff := math.Abs(float64(v.Int64Value.ValueInt64() - newValue.ValueInt64()))
+	diff := math.Abs(float64(v.ValueInt64() - newValue.ValueInt64()))
 	if diff < 500000000 {
 		return true, diags
 	}
 
-	var buff string = fmt.Sprintf("Current volume capacity differs too much vs requested value (%f bytes while allowed 500000000 bytes)", diff)
+	var buff = fmt.Sprintf("Current volume capacity differs too much vs requested value (%f bytes while allowed 500000000 bytes)", diff)
 	diags.AddError("Int64SemanticsEquals", buff)
 	return false, diags
 }

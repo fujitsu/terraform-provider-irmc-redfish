@@ -291,8 +291,8 @@ func (r *StorageResource) Create(ctx context.Context, req resource.CreateRequest
 		return
 	}
 
-	var endpoint string = plan.RedfishServer[0].Endpoint.ValueString()
-	var resource_name string = "resource-storage"
+	var endpoint = plan.RedfishServer[0].Endpoint.ValueString()
+	var resource_name = "resource-storage"
 	mutexPool.Lock(ctx, endpoint, resource_name)
 	defer mutexPool.Unlock(ctx, endpoint, resource_name)
 
@@ -304,7 +304,7 @@ func (r *StorageResource) Create(ctx context.Context, req resource.CreateRequest
 
 	defer api.Logout()
 
-	diags = applyStorageControllerProperties(ctx, api.Service, &plan)
+	diags = applyStorageControllerProperties(ctx, api, &plan)
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
 		return
@@ -366,8 +366,8 @@ func (r *StorageResource) Update(ctx context.Context, req resource.UpdateRequest
 		return
 	}
 
-	var endpoint string = plan.RedfishServer[0].Endpoint.ValueString()
-	var resource_name string = "resource-storage"
+	var endpoint = plan.RedfishServer[0].Endpoint.ValueString()
+	var resource_name = "resource-storage"
 	mutexPool.Lock(ctx, endpoint, resource_name)
 	defer mutexPool.Unlock(ctx, endpoint, resource_name)
 
@@ -379,7 +379,7 @@ func (r *StorageResource) Update(ctx context.Context, req resource.UpdateRequest
 
 	defer api.Logout()
 
-	diags = applyStorageControllerProperties(ctx, api.Service, &plan)
+	diags = applyStorageControllerProperties(ctx, api, &plan)
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
 		return

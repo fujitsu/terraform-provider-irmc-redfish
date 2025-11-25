@@ -134,14 +134,14 @@ func (r *VirtualMediaResource) Create(ctx context.Context, req resource.CreateRe
 	}
 
 	// Provide synchronization
-	var endpoint string = plan.RedfishServer[0].Endpoint.ValueString()
-	var resource_name string = "resource-virtual_media"
+	var endpoint = plan.RedfishServer[0].Endpoint.ValueString()
+	var resource_name = "resource-virtual_media"
 	mutexPool.Lock(ctx, endpoint, resource_name)
 	defer mutexPool.Unlock(ctx, endpoint, resource_name)
 
 	// Validate required image and define under which index it could be tried to be mounted
 	image := plan.Image.ValueString()
-	var imageType VmediaImageType = IMAGE_TYPE_UNKNOWN
+	var imageType = IMAGE_TYPE_UNKNOWN
 	redfish_index := "0"
 	if strings.HasSuffix(image, ".iso") {
 		imageType = IMAGE_TYPE_ISO
@@ -257,7 +257,7 @@ func (r *VirtualMediaResource) Update(ctx context.Context, req resource.UpdateRe
 
 	// Validate required image and define under which index it could be tried to be mounted
 	image := plan.Image.ValueString()
-	var imageType VmediaImageType = IMAGE_TYPE_UNKNOWN
+	var imageType = IMAGE_TYPE_UNKNOWN
 	if strings.HasSuffix(image, ".iso") {
 		imageType = IMAGE_TYPE_ISO
 	} else {

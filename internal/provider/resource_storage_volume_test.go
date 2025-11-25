@@ -38,7 +38,7 @@ func TestAccRedfishStorageVolume_basic(t *testing.T) {
 		Steps: []resource.TestStep{
 			{
 				Config: testAccRedfishResourceStorageVolumeConfig_withCapacity(
-					creds, os.Getenv("TF_TESTING_STORAGE_SERIAL_NUMBER"), "RAID0", 100000000, "my-name", 131072, "ReadAhead", "WriteThrough",
+					creds, os.Getenv("TF_TESTING_STORAGE_SERIAL_NUMBER"), "RAID0", 100000000, "my-name", 65536, "ReadAhead", "WriteThrough",
 				),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr(storage_volume_resource_name, "name", "my-name"),
@@ -58,9 +58,9 @@ func TestAccRedfishStorageVolume_InvalidStorageController(t *testing.T) {
 		Steps: []resource.TestStep{
 			{
 				Config: testAccRedfishResourceStorageVolumeConfig_withCapacity(
-					creds, "qwerty", "RAID0", 100000000, "my-name", 131072, "ReadAhead", "WriteThrough",
+					creds, "qwerty", "RAID0", 100000000, "my-name", 65536, "ReadAhead", "WriteThrough",
 				),
-				ExpectError: regexp.MustCompile("Requested Storage resource has not been found on list"),
+				ExpectError: regexp.MustCompile("Could not obtain storage controller with requested id"),
 			},
 		},
 	})
@@ -87,7 +87,7 @@ func testAccRedfishResourceStorageVolumeConfig_withCapacity(testingInfo TestingS
 
         storage_controller_serial_number = "%s"
         raid_type = "%s"
-        physical_drives = [ "[\"0\", \"3\"]" ]
+        physical_drives = [ "[\"1-8\", \"1-9\"]" ]
         capacity_bytes = %d
         name = "%s"
         optimum_io_size_bytes = %d

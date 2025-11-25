@@ -100,7 +100,15 @@ func (d *IrmcAttributesDataSource) Read(ctx context.Context, req datasource.Read
 		return
 	}
 
-	diags := readIrmcAttributesSettingsToModel(ctx, api.Service, &data.Attributes, true)
+	isFsas, err := IsFsasCheck(ctx, api)
+	if err != nil {
+		resp.Diagnostics.AddError("Vendor Detection Failed", err.Error())
+		return
+	}
+
+	endp := getIrmcAttributesEndpoints(isFsas)
+
+	diags := readIrmcAttributesSettingsToModel(ctx, api.Service, &data.Attributes, true, endp.irmcAttributesSettingsEndpoint)
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
 		return

@@ -25,8 +25,8 @@ import (
 
 func TestSyncPool(t *testing.T) {
 	pool := InitSyncPoolInstance()
-	var sum int = 0
-	var items int = 50
+	var sum = 0
+	var items = 50
 
 	t.Run("MutexTests", func(t *testing.T) {
 		var test = func() {

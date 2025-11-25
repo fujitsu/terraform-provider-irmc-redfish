@@ -153,8 +153,8 @@ func (r *BootOrderResource) Create(ctx context.Context, req resource.CreateReque
 	}
 
 	// Provide synchronization
-	var endpoint string = plan.RedfishServer[0].Endpoint.ValueString()
-	var resource_name string = "resource-boot_order"
+	var endpoint = plan.RedfishServer[0].Endpoint.ValueString()
+	var resource_name = "resource-boot_order"
 	mutexPool.Lock(ctx, endpoint, resource_name)
 	defer mutexPool.Unlock(ctx, endpoint, resource_name)
 
@@ -355,7 +355,7 @@ func applyBootOrderPlan(service *gofish.Service, currentBootOrder []BootOrderEnt
 		return diags
 	}
 
-	res.Body.Close()
+	CloseResource(res.Body)
 
 	var v [][]string
 	for _, item := range plannedBootOrder {
@@ -383,7 +383,7 @@ func applyBootOrderPlan(service *gofish.Service, currentBootOrder []BootOrderEnt
 		return diags
 	}
 
-	res.Body.Close()
+	CloseResource(res.Body)
 	return diags
 }
 
@@ -398,7 +398,7 @@ func getBiosSettingsFutureAttributesNumber(service *gofish.Service) (length int,
 		return 0, diags
 	}
 
-	defer res.Body.Close()
+	defer CloseResource(res.Body)
 
 	var config BiosSettings
 	bodyBytes, err := io.ReadAll(res.Body)
@@ -426,7 +426,7 @@ func waitTillBootOrderApplied(ctx context.Context, service *gofish.Service, plan
 	}
 
 	timeout := plan.JobTimeout.ValueInt64()
-	var logMsg string = fmt.Sprintf("Process will wait with %d seconds timeout to finish", timeout)
+	var logMsg = fmt.Sprintf("Process will wait with %d seconds timeout to finish", timeout)
 	tflog.Info(ctx, logMsg)
 
 	startTime := time.Now().Unix()
@@ -463,7 +463,7 @@ func waitTillBootOrderApplied(ctx context.Context, service *gofish.Service, plan
 		   it will contain all writable properties. It's not best mechanism, but the only one known as of now
 		*/
 		if numberOfKeysInMap > 5 {
-			var logMsg string = fmt.Sprintf("Number of keys %d", numberOfKeysInMap)
+			var logMsg = fmt.Sprintf("Number of keys %d", numberOfKeysInMap)
 			tflog.Info(ctx, logMsg)
 			break
 		}
@@ -562,7 +562,7 @@ func validateBootOrderPlan(service *gofish.Service, plannedBootOrder BootOrder) 
 		// If any planned option does not exist on currently configured boot order, raise error
 		for _, v := range plannedBootOrder {
 			if !isBootEntryInBootOrder(v, currentBootOrder) {
-				var msg string = fmt.Sprintf("Entry '%s' is not on the list of supported boot entries for the system '%s'", v, currentBootOrder)
+				var msg = fmt.Sprintf("Entry '%s' is not on the list of supported boot entries for the system '%s'", v, currentBootOrder)
 				diags.AddError("Planned changes for boot order did not pass validation", msg)
 			}
 		}
@@ -573,14 +573,14 @@ func validateBootOrderPlan(service *gofish.Service, plannedBootOrder BootOrder) 
 
 		// If planned configuration does not contain all options for the system, stop
 		if len(plannedBootOrder) != len(currentBootOrder) {
-			var details string = fmt.Sprintf("Planned boot order has length of %d, while current length of %d",
+			var details = fmt.Sprintf("Planned boot order has length of %d, while current length of %d",
 				len(plannedBootOrder), len(currentBootOrder))
 			diags.AddError("Planned boot order has different length than currently configured boot order", details)
 			return currentBootOrder, diags
 		}
 
 		if diff := findAvailableAndNotPlannedBootEntries(currentBootOrder, plannedBootOrder); len(diff) > 0 {
-			var details string = fmt.Sprintf("Planned boot order does not contain available boot options '%s'",
+			var details = fmt.Sprintf("Planned boot order does not contain available boot options '%s'",
 				strings.Join(diff, ""))
 			diags.AddError("Planned boot order does not contain all available boot options", details)
 			return currentBootOrder, diags
