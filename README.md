@@ -30,6 +30,7 @@ The provider is released and licensed under the MPL-2.0 license. See [License](L
 ## Prerequisites
 - [Terraform](https://developer.hashicorp.com/terraform/downloads) >= 1.0
 - [Go](https://golang.org/doc/install) >= 1.21
+- PRIMERGY system iRMCS6-based generations: M7, M2 (AMD), monoM6 and M8
 
 ## List of supported data sources
 * [Bios](docs/data-sources/bios.md)
